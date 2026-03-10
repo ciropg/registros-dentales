@@ -10,6 +10,32 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.patient.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.role.deleteMany();
+
+  await prisma.role.createMany({
+    data: [
+      {
+        code: UserRole.ADMIN,
+        name: "Administrador",
+        description: "Acceso total al sistema.",
+      },
+      {
+        code: UserRole.DENTIST,
+        name: "Dentista",
+        description: "Gestion clinica de tratamientos y citas.",
+      },
+      {
+        code: UserRole.ASSISTANT,
+        name: "Asistente",
+        description: "Soporte operativo de pacientes, tratamientos y citas.",
+      },
+      {
+        code: UserRole.RECEPTIONIST,
+        name: "Recepcionista",
+        description: "Gestion operativa de pacientes y agenda.",
+      },
+    ],
+  });
 
   const adminPassword = await bcrypt.hash("Admin123!", 10);
   const dentistPassword = await bcrypt.hash("Dentista123!", 10);
