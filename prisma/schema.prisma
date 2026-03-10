@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  DENTIST
+  ASSISTANT
+  RECEPTIONIST
+}
+
+
+enum TreatmentStatus {
+  PLANNED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELED
+}
+
+enum PhaseStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  ATTENDED
+  NO_SHOW
+  RESCHEDULED
+  CANCELED
+}
+
+model User {
+  id         String      @id @default(cuid())
+  name       String
+  email      String      @unique
+  passwordHash String
+  role       UserRole
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  treatments Treatment[] @relation("DentistTreatments")
+  auditLogs  AuditLog[]
+}
+
+model Patient {
+  id             String        @id @default(cuid())
+  firstName      String
+  lastName       String
+  documentNumber String?       @unique
+  phone          String?
+  email          String?
+  birthDate      DateTime?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  treatments     Treatment[]
+  appointments   Appointment[]
+}
+
+model Treatment {
+  id               String          @id @default(cuid())
+  patientId        String
+  dentistId        String?
+  title            String
+  diagnosis        String
+  startDate        DateTime
+  estimatedEndDate DateTime
+  actualEndDate    DateTime?
+  status           TreatmentStatus @default(PLANNED)
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  patient          Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  dentist          User?           @relation("DentistTreatments", fields: [dentistId], references: [id], onDelete: SetNull)
+  phases           TreatmentPhase[]
+  appointments     Appointment[]
+
+  @@index([patientId])
+  @@index([dentistId])
+  @@index([status])
+}
+
+model TreatmentPhase {
+  id            String      @id @default(cuid())
+  treatmentId   String
+  name          String
+  phaseOrder    Int
+  weight        Int         @default(1)
+  status        PhaseStatus @default(PENDING)
+  plannedDate   DateTime?
+  completedDate DateTime?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  treatment     Treatment   @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+
+  @@index([treatmentId])
+  @@unique([treatmentId, phaseOrder])
+}
+
+model Appointment {
+  id               String            @id @default(cuid())
+  patientId        String
+  treatmentId      String?
+  scheduledAt      DateTime
+  status           AppointmentStatus @default(SCHEDULED)
+  reason           String
+  notes            String?
+  rescheduledFromId String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  patient          Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  treatment        Treatment?        @relation(fields: [treatmentId], references: [id], onDelete: SetNull)
+  rescheduledFrom  Appointment?      @relation("AppointmentReschedule", fields: [rescheduledFromId], references: [id], onDelete: SetNull)
+  reschedules      Appointment[]     @relation("AppointmentReschedule")
+
+  @@index([patientId])
+  @@index([treatmentId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  entityType  String
+  entityId    String
+  action      String
+  description String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
