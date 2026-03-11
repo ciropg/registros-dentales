@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, inputClassName } from "@/components/ui/field";
+import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
 import { requireUser } from "@/lib/auth";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
@@ -172,7 +172,7 @@ export default async function PatientDetailPage({
               : "Adjunta fotos clinicas del paciente y conservalas en el entorno real."
           }
           action={
-            <form action={uploadPatientPhotoAction} className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <form action={uploadPatientPhotoAction} className="grid gap-3 md:grid-cols-[1fr_1.2fr_auto]">
               <input type="hidden" name="patientId" value={patient.id} />
               <Field label="Nueva foto">
                 <input
@@ -181,6 +181,15 @@ export default async function PatientDetailPage({
                   name="photo"
                   accept="image/*"
                   required
+                />
+              </Field>
+              <Field label="Descripcion" hint="Opcional. Ayuda a identificar la foto en la ficha del paciente.">
+                <textarea
+                  className={textareaClassName}
+                  name="description"
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Ejemplo: Radiografia inicial o control postoperatorio"
                 />
               </Field>
               <button type="submit" className={buttonStyles({ className: "self-end" })}>
@@ -205,15 +214,24 @@ export default async function PatientDetailPage({
                 </div>
                 <div className="space-y-2 p-4 text-sm">
                   <p className="font-semibold text-foreground">{photo.originalFilename ?? "Foto clinica"}</p>
+                  <p className="text-muted">{photo.description ?? "Sin descripcion."}</p>
                   <p className="text-muted">Subida: {formatDateTime(photo.createdAt)}</p>
-                  <a
-                    href={photo.secureUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex text-sm font-semibold text-brand"
-                  >
-                    Abrir original
-                  </a>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`/patients/${patient.id}/photos/${photo.id}/download`}
+                      className={buttonStyles({ variant: "secondary", size: "sm" })}
+                    >
+                      Descargar
+                    </a>
+                    <a
+                      href={photo.secureUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={buttonStyles({ variant: "ghost", size: "sm" })}
+                    >
+                      Abrir original
+                    </a>
+                  </div>
                 </div>
               </div>
             ))

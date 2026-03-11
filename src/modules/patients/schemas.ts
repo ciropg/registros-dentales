@@ -33,3 +33,13 @@ export const patientCreateSchema = z.object({
     .optional()
     .transform((value) => value || undefined),
 });
+
+export const patientPhotoUploadSchema = z.object({
+  description: z
+    .string()
+    .trim()
+    .max(500, "La descripcion no puede superar 500 caracteres.")
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => value || undefined),
+});

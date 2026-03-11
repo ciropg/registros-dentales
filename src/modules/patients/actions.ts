@@ -7,7 +7,7 @@ import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
-import { patientCreateSchema } from "@/modules/patients/schemas";
+import { patientCreateSchema, patientPhotoUploadSchema } from "@/modules/patients/schemas";
 
 const DEMO_PATIENT_PHOTO_LIMIT = 5;
 const MAX_PATIENT_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
@@ -133,6 +133,14 @@ export async function uploadPatientPhotoAction(formData: FormData) {
     redirect(`${redirectPath}${buildErrorSearch(parsedFile.error)}`);
   }
 
+  const parsedMetadata = patientPhotoUploadSchema.safeParse({
+    description: formData.get("description"),
+  });
+
+  if (!parsedMetadata.success) {
+    redirect(`${redirectPath}${buildErrorSearch(parsedMetadata.error.issues[0]?.message ?? "No se pudo validar la descripcion de la foto.")}`);
+  }
+
   const patient = await prisma.patient.findUnique({
     where: { id: patientId },
     select: {
@@ -165,6 +173,7 @@ export async function uploadPatientPhotoAction(formData: FormData) {
         publicId: upload.public_id,
         secureUrl: upload.secure_url,
         originalFilename: parsedFile.file.name,
+        description: parsedMetadata.data.description,
         width: upload.width,
         height: upload.height,
         bytes: upload.bytes,

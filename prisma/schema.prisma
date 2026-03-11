@@ -168,6 +168,7 @@ model PatientPhoto {
   publicId         String   @unique
   secureUrl        String
   originalFilename String?
+  description      String?
   width            Int?
   height           Int?
   bytes            Int?
