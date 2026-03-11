@@ -41,6 +41,10 @@ export async function GET(
     cache: "no-store",
   });
 
+  if (upstream.status === 404) {
+    return new Response("Not found", { status: 404 });
+  }
+
   if (!upstream.ok) {
     return new Response("Unable to download image", { status: 502 });
   }

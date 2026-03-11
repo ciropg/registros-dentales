@@ -13,7 +13,7 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDate, formatDateTime } from "@/lib/date";
 import { toSearchParam } from "@/lib/utils";
-import { uploadPatientPhotoAction } from "@/modules/patients/actions";
+import { deletePatientPhotoAction, uploadPatientPhotoAction } from "@/modules/patients/actions";
 import { getPatientDetail } from "@/modules/patients/queries";
 
 export default async function PatientDetailPage({
@@ -231,6 +231,13 @@ export default async function PatientDetailPage({
                     >
                       Abrir original
                     </a>
+                    <form action={deletePatientPhotoAction}>
+                      <input type="hidden" name="patientId" value={patient.id} />
+                      <input type="hidden" name="photoId" value={photo.id} />
+                      <button type="submit" className={buttonStyles({ variant: "danger", size: "sm" })}>
+                        Eliminar
+                      </button>
+                    </form>
                   </div>
                 </div>
               </div>

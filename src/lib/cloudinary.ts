@@ -6,13 +6,21 @@ import {
 
 let configured = false;
 
+function normalizeEnvValue(value: string | undefined) {
+  return value?.trim();
+}
+
 function getCloudinaryConfig() {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  const cloudName = normalizeEnvValue(process.env.CLOUDINARY_CLOUD_NAME);
+  const apiKey = normalizeEnvValue(process.env.CLOUDINARY_API_KEY);
+  const apiSecret = normalizeEnvValue(process.env.CLOUDINARY_API_SECRET);
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error("Cloudinary is not configured.");
+  }
+
+  if (!/^[a-z0-9_-]+$/i.test(cloudName)) {
+    throw new Error("Invalid Cloudinary cloud name.");
   }
 
   return {

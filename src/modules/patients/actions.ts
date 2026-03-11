@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { deletePatientImage, uploadPatientImage } from "@/lib/cloudinary";
 import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
@@ -14,6 +15,36 @@ const MAX_PATIENT_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
 
 function getPatientRedirectPath(patientId: string) {
   return `/patients/${patientId}`;
+}
+
+function getPatientPhotoUploadErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "No se pudo subir la foto del paciente.";
+  }
+
+  if (
+    error.message === "Cloudinary is not configured."
+    || error.message === "Invalid Cloudinary cloud name."
+  ) {
+    return "La configuracion de Cloudinary es invalida. Revisa CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.";
+  }
+
+  return "No se pudo subir la foto del paciente.";
+}
+
+function getPatientPhotoDeleteErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "No se pudo eliminar la foto del paciente.";
+  }
+
+  if (
+    error.message === "Cloudinary is not configured."
+    || error.message === "Invalid Cloudinary cloud name."
+  ) {
+    return "La foto se puede quitar del sistema, pero la configuracion de Cloudinary es invalida.";
+  }
+
+  return "No se pudo eliminar la foto del paciente.";
 }
 
 function parsePatientPhotoFile(file: FormDataEntryValue | null): { file: File } | { error: string } {
@@ -205,11 +236,87 @@ export async function uploadPatientPhotoAction(formData: FormData) {
       : "Foto adjuntada correctamente.";
 
     redirect(`${redirectPath}${buildSuccessSearch(message)}`);
-  } catch {
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    console.error("Patient photo upload failed", error);
+
     if (uploadedPublicId) {
       await Promise.allSettled([deletePatientImage(uploadedPublicId)]);
     }
 
-    redirect(`${redirectPath}${buildErrorSearch("No se pudo subir la foto del paciente.")}`);
+    redirect(`${redirectPath}${buildErrorSearch(getPatientPhotoUploadErrorMessage(error))}`);
+  }
+}
+
+export async function deletePatientPhotoAction(formData: FormData) {
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const patientId = String(formData.get("patientId") ?? "");
+  const photoId = String(formData.get("photoId") ?? "");
+  const redirectPath = patientId ? getPatientRedirectPath(patientId) : "/patients";
+
+  if (!patientId || !photoId) {
+    redirect(`/patients${buildErrorSearch("No se pudo identificar la foto a eliminar.")}`);
+  }
+
+  const photo = await prisma.patientPhoto.findFirst({
+    where: {
+      id: photoId,
+      patientId,
+      isDemo: user.isDemo,
+    },
+    select: {
+      id: true,
+      publicId: true,
+      originalFilename: true,
+      patient: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  });
+
+  if (!photo) {
+    redirect(`${redirectPath}${buildErrorSearch("La foto ya no existe o no pertenece a tu entorno.")}`);
+  }
+
+  try {
+    await prisma.patientPhoto.delete({
+      where: {
+        id: photo.id,
+      },
+    });
+
+    await Promise.allSettled([deletePatientImage(photo.publicId)]);
+
+    await recordAudit({
+      actorId: user.id,
+      entityType: "patient-photo",
+      entityId: photo.id,
+      action: "PATIENT_PHOTO_DELETED",
+      description: `Se elimino una foto del paciente ${photo.patient.firstName} ${photo.patient.lastName}.`,
+      metadata: {
+        patientId: photo.patient.id,
+        isDemo: user.isDemo,
+        originalFilename: photo.originalFilename,
+      },
+    });
+
+    revalidatePath("/patients");
+    revalidatePath(redirectPath);
+    redirect(`${redirectPath}${buildSuccessSearch("Foto eliminada correctamente.")}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    console.error("Patient photo delete failed", error);
+
+    redirect(`${redirectPath}${buildErrorSearch(getPatientPhotoDeleteErrorMessage(error))}`);
   }
 }
