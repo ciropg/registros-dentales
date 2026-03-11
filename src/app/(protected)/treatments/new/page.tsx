@@ -63,16 +63,15 @@ export default async function NewTreatmentPage({
             <div />
           </div>
 
-          <Field label="Diagnostico">
+          <Field label="Diagnostico" hint="Opcional.">
             <textarea
               className={textareaClassName}
               name="diagnosis"
               placeholder="Diagnostico clinico resumido"
-              required
             />
           </Field>
 
-          <Field label="Notas operativas">
+          <Field label="Notas operativas" hint="Opcional.">
             <textarea
               className={textareaClassName}
               name="notes"

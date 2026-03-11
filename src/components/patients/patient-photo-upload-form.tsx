@@ -110,6 +110,7 @@ export function PatientPhotoUploadForm({
             name="photo"
             accept="image/*"
             required
+            onClick={(event) => event.stopPropagation()}
             onChange={handleInputChange}
           />
         </div>

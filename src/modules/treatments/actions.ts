@@ -87,7 +87,7 @@ export async function createTreatmentAction(formData: FormData) {
       patientId: patient.id,
       dentistId,
       title: parsed.data.title,
-      diagnosis: parsed.data.diagnosis,
+      diagnosis: parsed.data.diagnosis ?? "",
       startDate: new Date(parsed.data.startDate),
       estimatedEndDate: new Date(parsed.data.estimatedEndDate),
       notes: parsed.data.notes,

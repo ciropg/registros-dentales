@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
@@ -8,13 +9,164 @@ import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
-import { patientCreateSchema, patientPhotoUploadSchema } from "@/modules/patients/schemas";
+import {
+  patientCreateFields,
+  type PatientCreateActionState,
+} from "@/modules/patients/create-patient-form-state";
+import { patientCreateSchema, patientPhotoUploadSchema, patientUpdateSchema } from "@/modules/patients/schemas";
 
 const DEMO_PATIENT_PHOTO_LIMIT = 5;
 const MAX_PATIENT_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
 
 function getPatientRedirectPath(patientId: string) {
   return `/patients/${patientId}`;
+}
+
+function getPatientEditRedirectPath(patientId: string) {
+  return `/patients/${patientId}/edit`;
+}
+
+function revalidatePatientPaths(patientId?: string) {
+  revalidatePath("/patients");
+  revalidatePath("/patients/new");
+  revalidatePath("/appointments");
+  revalidatePath("/appointments/new");
+  revalidatePath("/dashboard");
+  revalidatePath("/treatments/new");
+
+  if (patientId) {
+    revalidatePath(getPatientRedirectPath(patientId));
+    revalidatePath(getPatientEditRedirectPath(patientId));
+  }
+}
+
+function logPatientImageCleanupFailures(results: PromiseSettledResult<unknown>[], patientId: string) {
+  const failedCount = results.filter((result) => result.status === "rejected").length;
+
+  if (!failedCount) {
+    return;
+  }
+
+  console.warn(`Patient delete cleanup failed for ${failedCount} photo(s) of patient ${patientId}.`);
+}
+
+function buildPatientCreateFieldErrors(
+  fieldErrors: Record<string, string[] | undefined>,
+): PatientCreateActionState["fieldErrors"] {
+  const nextErrors: PatientCreateActionState["fieldErrors"] = {};
+
+  for (const field of patientCreateFields) {
+    const message = fieldErrors[field]?.[0];
+
+    if (message) {
+      nextErrors[field] = message;
+    }
+  }
+
+  return nextErrors;
+}
+
+function buildDuplicatePatientNameFieldErrors(): PatientCreateActionState["fieldErrors"] {
+  return {
+    firstName: "Ya existe un paciente con ese nombre y apellido en este entorno.",
+    lastName: "Ya existe un paciente con ese nombre y apellido en este entorno.",
+  };
+}
+
+function getPatientUniqueConstraintFieldErrors(error: Prisma.PrismaClientKnownRequestError) {
+  const target = error.meta?.target;
+  const targetFields = Array.isArray(target)
+    ? target.map((value) => String(value))
+    : typeof target === "string"
+      ? [target]
+      : [];
+
+  if (targetFields.includes("documentNumber")) {
+    return {
+      documentNumber: "Ya existe un paciente con ese documento en este entorno.",
+    } satisfies PatientCreateActionState["fieldErrors"];
+  }
+
+  if (targetFields.includes("firstName") || targetFields.includes("lastName")) {
+    return buildDuplicatePatientNameFieldErrors();
+  }
+
+  return {};
+}
+
+async function getPatientOrRedirect(patientId: string, isDemo: boolean, redirectPath: string) {
+  const patient = await prisma.patient.findFirst({
+    where: {
+      id: patientId,
+      isDemo,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!patient) {
+    redirect(`${redirectPath}${buildErrorSearch("El paciente ya no existe o no pertenece a tu entorno.")}`);
+  }
+
+  return patient;
+}
+
+async function findDuplicatePatientFieldErrors(params: {
+  patientId?: string;
+  firstName: string;
+  lastName: string;
+  documentNumber?: string;
+  isDemo: boolean;
+}) {
+  if (params.documentNumber) {
+    const existingPatientWithDocument = await prisma.patient.findFirst({
+      where: {
+        documentNumber: params.documentNumber,
+        isDemo: params.isDemo,
+        ...(params.patientId
+          ? {
+              id: {
+                not: params.patientId,
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingPatientWithDocument) {
+      return {
+        documentNumber: "Ya existe un paciente con ese documento en este entorno.",
+      } satisfies PatientCreateActionState["fieldErrors"];
+    }
+  }
+
+  const existingPatientWithSameName = await prisma.patient.findFirst({
+    where: {
+      firstName: params.firstName,
+      lastName: params.lastName,
+      isDemo: params.isDemo,
+      ...(params.patientId
+        ? {
+            id: {
+              not: params.patientId,
+            },
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (existingPatientWithSameName) {
+    return buildDuplicatePatientNameFieldErrors();
+  }
+
+  return null;
 }
 
 function getPatientPhotoUploadErrorMessage(error: unknown) {
@@ -108,7 +260,10 @@ async function trimDemoPatientPhotos(excludedPhotoId: string) {
   return photosToDelete;
 }
 
-export async function createPatientAction(formData: FormData) {
+export async function createPatientAction(
+  _previousState: PatientCreateActionState,
+  formData: FormData,
+): Promise<PatientCreateActionState> {
   const user = await requireBaseRole(["ADMIN", "ASSISTANT", "RECEPTIONIST"]);
 
   const parsed = patientCreateSchema.safeParse({
@@ -122,10 +277,25 @@ export async function createPatientAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`/patients/new${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo crear el paciente.")}`);
+    return {
+      message: "Corrige los campos marcados.",
+      fieldErrors: buildPatientCreateFieldErrors(parsed.error.flatten().fieldErrors),
+    };
   }
 
   try {
+    const duplicateFieldErrors = await findDuplicatePatientFieldErrors({
+      ...parsed.data,
+      isDemo: user.isDemo,
+    });
+
+    if (duplicateFieldErrors) {
+      return {
+        message: "Corrige los campos marcados.",
+        fieldErrors: duplicateFieldErrors,
+      };
+    }
+
     const patient = await prisma.patient.create({
       data: {
         ...parsed.data,
@@ -142,11 +312,202 @@ export async function createPatientAction(formData: FormData) {
       description: `Se creo el paciente ${patient.firstName} ${patient.lastName}.`,
     });
 
-    revalidatePath("/patients");
-    revalidatePath("/dashboard");
+    revalidatePatientPaths(patient.id);
     redirect(`/patients/${patient.id}${buildSuccessSearch("Paciente creado correctamente.")}`);
-  } catch {
-    redirect(`/patients/new${buildErrorSearch("No se pudo guardar el paciente. Verifica que el documento o email no esten duplicados.")}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return {
+        message: "Corrige los campos marcados.",
+        fieldErrors: getPatientUniqueConstraintFieldErrors(error),
+      };
+    }
+
+    console.error("Patient create failed", error);
+    return {
+      message: "No se pudo guardar el paciente.",
+      fieldErrors: {},
+    };
+  }
+}
+
+export async function updatePatientAction(
+  _previousState: PatientCreateActionState,
+  formData: FormData,
+): Promise<PatientCreateActionState> {
+  const user = await requireBaseRole(["ADMIN", "ASSISTANT", "RECEPTIONIST"]);
+
+  const parsed = patientUpdateSchema.safeParse({
+    patientId: formData.get("patientId"),
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
+    documentNumber: formData.get("documentNumber"),
+    phone: formData.get("phone"),
+    email: formData.get("email"),
+    birthDate: formData.get("birthDate"),
+    notes: formData.get("notes"),
+  });
+
+  if (!parsed.success) {
+    return {
+      message: "Corrige los campos marcados.",
+      fieldErrors: buildPatientCreateFieldErrors(parsed.error.flatten().fieldErrors),
+    };
+  }
+
+  const redirectPath = getPatientEditRedirectPath(parsed.data.patientId);
+  await getPatientOrRedirect(parsed.data.patientId, user.isDemo, "/patients");
+
+  try {
+    const duplicateFieldErrors = await findDuplicatePatientFieldErrors({
+      patientId: parsed.data.patientId,
+      firstName: parsed.data.firstName,
+      lastName: parsed.data.lastName,
+      documentNumber: parsed.data.documentNumber,
+      isDemo: user.isDemo,
+    });
+
+    if (duplicateFieldErrors) {
+      return {
+        message: "Corrige los campos marcados.",
+        fieldErrors: duplicateFieldErrors,
+      };
+    }
+
+    const patient = await prisma.patient.update({
+      where: {
+        id: parsed.data.patientId,
+      },
+      data: {
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        documentNumber: parsed.data.documentNumber,
+        phone: parsed.data.phone,
+        email: parsed.data.email,
+        birthDate: parsed.data.birthDate ? new Date(parsed.data.birthDate) : null,
+        notes: parsed.data.notes,
+      },
+    });
+
+    await recordAudit({
+      actorId: user.id,
+      entityType: "patient",
+      entityId: patient.id,
+      action: "PATIENT_UPDATED",
+      description: `Se actualizo el paciente ${patient.firstName} ${patient.lastName}.`,
+    });
+
+    revalidatePatientPaths(patient.id);
+    redirect(`${getPatientRedirectPath(patient.id)}${buildSuccessSearch("Paciente actualizado correctamente.")}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return {
+        message: "Corrige los campos marcados.",
+        fieldErrors: getPatientUniqueConstraintFieldErrors(error),
+      };
+    }
+
+    console.error("Patient update failed", error);
+
+    redirect(`${redirectPath}${buildErrorSearch("No se pudo actualizar el paciente.")}`);
+  }
+}
+
+export async function deletePatientAction(formData: FormData) {
+  const user = await requireBaseRole(["ADMIN", "ASSISTANT", "RECEPTIONIST"]);
+  const patientId = String(formData.get("patientId") ?? "");
+  const redirectPath = getPatientRedirectPath(patientId);
+
+  if (!patientId) {
+    redirect(`/patients${buildErrorSearch("No se pudo identificar el paciente.")}`);
+  }
+
+  const patient = await prisma.patient.findFirst({
+    where: {
+      id: patientId,
+      isDemo: user.isDemo,
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      photos: {
+        where: {
+          isDemo: user.isDemo,
+        },
+        select: {
+          id: true,
+          publicId: true,
+        },
+      },
+      _count: {
+        select: {
+          appointments: {
+            where: {
+              isDemo: user.isDemo,
+            },
+          },
+          treatments: {
+            where: {
+              isDemo: user.isDemo,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!patient) {
+    redirect(`/patients${buildErrorSearch("El paciente ya no existe o no pertenece a tu entorno.")}`);
+  }
+
+  try {
+    await prisma.$transaction(async (transaction) => {
+      await transaction.auditLog.create({
+        data: {
+          actorId: user.id,
+          entityType: "patient",
+          entityId: patient.id,
+          action: "PATIENT_DELETED",
+          description: `Se elimino el paciente ${patient.firstName} ${patient.lastName}.`,
+          metadata: JSON.stringify({
+            isDemo: user.isDemo,
+            treatmentCount: patient._count.treatments,
+            appointmentCount: patient._count.appointments,
+            photoCount: patient.photos.length,
+          }),
+        },
+      });
+
+      await transaction.patient.delete({
+        where: {
+          id: patient.id,
+        },
+      });
+    });
+
+    const cleanupResults = await Promise.allSettled(
+      patient.photos.map((photo) => deletePatientImage(photo.publicId)),
+    );
+
+    logPatientImageCleanupFailures(cleanupResults, patient.id);
+
+    revalidatePatientPaths();
+    redirect(`/patients${buildSuccessSearch("Paciente eliminado correctamente.")}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    console.error("Patient delete failed", error);
+    redirect(`${redirectPath}${buildErrorSearch("No se pudo eliminar el paciente.")}`);
   }
 }
 

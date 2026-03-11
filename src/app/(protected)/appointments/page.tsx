@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { AppointmentStatus } from "@prisma/client";
+import { format } from "date-fns";
 import { Topbar } from "@/components/layout/topbar";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, selectClassName } from "@/components/ui/field";
+import { Field, inputClassName, selectClassName } from "@/components/ui/field";
 import { requireUser } from "@/lib/auth";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDateTime } from "@/lib/date";
@@ -16,6 +17,28 @@ import { listAppointments } from "@/modules/appointments/queries";
 
 const statusFilters: Array<AppointmentStatus | "ALL"> = ["ALL", ...Object.values(AppointmentStatus)];
 
+function buildAppointmentsFilterHref(
+  status: AppointmentStatus | "ALL",
+  date: string,
+  dateScope: "day" | "all",
+) {
+  const params = new URLSearchParams();
+
+  if (status !== "ALL") {
+    params.set("status", status);
+  }
+
+  if (dateScope === "all") {
+    params.set("dateScope", "all");
+  } else {
+    params.set("date", date);
+  }
+
+  const query = params.toString();
+
+  return query ? `/appointments?${query}` : "/appointments";
+}
+
 export default async function AppointmentsPage({
   searchParams,
 }: {
@@ -23,10 +46,26 @@ export default async function AppointmentsPage({
 }) {
   const params = await searchParams;
   const user = await requireUser();
-  const selectedStatus = toSearchParam(params.status) ?? "ALL";
+  const today = format(new Date(), "yyyy-MM-dd");
+  const statusParam = toSearchParam(params.status);
+  const selectedStatus = statusFilters.includes((statusParam ?? "ALL") as AppointmentStatus | "ALL")
+    ? ((statusParam ?? "ALL") as AppointmentStatus | "ALL")
+    : "ALL";
+  const dateScope = toSearchParam(params.dateScope) === "all" ? "all" : "day";
+  const selectedDate = toSearchParam(params.date) || today;
   const success = toSearchParam(params.success);
   const error = toSearchParam(params.error);
-  const appointments = await listAppointments(user.isDemo, selectedStatus === "ALL" ? undefined : selectedStatus);
+  const appointments = await listAppointments(
+    user.isDemo,
+    selectedStatus === "ALL" ? undefined : selectedStatus,
+    dateScope === "all" ? undefined : selectedDate,
+    dateScope === "all",
+  );
+  const redirectPath = buildAppointmentsFilterHref(
+    selectedStatus === "ALL" ? "ALL" : selectedStatus,
+    selectedDate,
+    dateScope,
+  );
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
@@ -46,13 +85,47 @@ export default async function AppointmentsPage({
       <Card>
         <CardHeader
           eyebrow="Filtro"
-          title="Estados de cita"
-          description="Filtra la agenda por estado operativo."
+          title="Filtros de agenda"
+          description="Filtra la agenda por estado operativo y fecha. Por defecto se muestra hoy, pero puedes ver todas ordenadas por cercania."
         />
 
         <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            href={buildAppointmentsFilterHref(selectedStatus, today, "day")}
+            className={buttonStyles({
+              variant: dateScope === "day" && selectedDate === today ? "primary" : "secondary",
+              size: "sm",
+            })}
+          >
+            Hoy
+          </Link>
+          <Link
+            href={buildAppointmentsFilterHref(selectedStatus, selectedDate, "all")}
+            className={buttonStyles({
+              variant: dateScope === "all" ? "primary" : "secondary",
+              size: "sm",
+            })}
+          >
+            Todas las citas
+          </Link>
+        </div>
+
+        <form className="mt-6 grid gap-3 md:grid-cols-[220px_auto]">
+          <Field label="Fecha">
+            <input className={inputClassName} type="date" name="date" defaultValue={selectedDate} />
+          </Field>
+          <div className="self-end">
+            <button type="submit" className={buttonStyles({ variant: "secondary" })}>
+              Aplicar fecha
+            </button>
+          </div>
+          <input type="hidden" name="dateScope" value="day" />
+          {selectedStatus !== "ALL" ? <input type="hidden" name="status" value={selectedStatus} /> : null}
+        </form>
+
+        <div className="mt-6 flex flex-wrap gap-3">
           {statusFilters.map((status) => {
-            const href = status === "ALL" ? "/appointments" : `/appointments?status=${status}`;
+            const href = buildAppointmentsFilterHref(status, selectedDate, dateScope);
             const active = selectedStatus === status;
 
             return (
@@ -99,7 +172,7 @@ export default async function AppointmentsPage({
                       <p className="text-lg text-foreground">
                         {appointment.patient.firstName} {appointment.patient.lastName}
                       </p>
-                      <p className="mt-1 text-sm text-muted">{appointment.reason}</p>
+                      <p className="mt-1 text-sm text-muted">{appointment.reason || "Sin motivo registrado."}</p>
                       <p className="mt-1 text-sm text-muted">{formatDateTime(appointment.scheduledAt)}</p>
                       <p className="mt-1 text-sm text-muted">
                         Tratamiento: {appointment.treatment?.title ?? "No asociado"}
@@ -129,7 +202,7 @@ export default async function AppointmentsPage({
                     className="grid gap-3 rounded-3xl border border-line bg-white/80 p-4 lg:min-w-[320px]"
                   >
                     <input type="hidden" name="appointmentId" value={appointment.id} />
-                    <input type="hidden" name="redirectPath" value="/appointments" />
+                    <input type="hidden" name="redirectPath" value={redirectPath} />
                     <Field label="Estado">
                       <select className={selectClassName} name="status" defaultValue={appointment.status}>
                         {Object.values(AppointmentStatus).map((status) => (

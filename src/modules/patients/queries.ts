@@ -34,6 +34,11 @@ export async function listPatients(isDemo: boolean, search?: string) {
               isDemo,
             },
           },
+          photos: {
+            where: {
+              isDemo,
+            },
+          },
         },
       },
     },
@@ -130,6 +135,25 @@ export async function getPatientDetail(patientId: string, isDemo: boolean) {
       metrics: calculateTreatmentMetrics(treatment),
     })),
   };
+}
+
+export async function getPatientFormDetail(patientId: string, isDemo: boolean) {
+  return prisma.patient.findFirst({
+    where: {
+      id: patientId,
+      isDemo,
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      documentNumber: true,
+      phone: true,
+      email: true,
+      birthDate: true,
+      notes: true,
+    },
+  });
 }
 
 export async function getPatientOptions(isDemo: boolean) {

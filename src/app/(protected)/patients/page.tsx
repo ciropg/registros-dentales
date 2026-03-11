@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Topbar } from "@/components/layout/topbar";
+import { DeletePatientForm } from "@/components/patients/delete-patient-form";
+import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -10,6 +12,7 @@ import { requireUser } from "@/lib/auth";
 import { daysLabel, formatDate } from "@/lib/date";
 import { treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { toSearchParam } from "@/lib/utils";
+import { deletePatientAction } from "@/modules/patients/actions";
 import { listPatients } from "@/modules/patients/queries";
 
 export default async function PatientsPage({
@@ -20,6 +23,8 @@ export default async function PatientsPage({
   const params = await searchParams;
   const user = await requireUser();
   const q = toSearchParam(params.q);
+  const success = toSearchParam(params.success);
+  const error = toSearchParam(params.error);
   const patients = await listPatients(user.isDemo, q);
 
   return (
@@ -33,6 +38,9 @@ export default async function PatientsPage({
           </Link>
         }
       />
+
+      {success ? <Alert message={success} tone="success" /> : null}
+      {error ? <Alert message={error} tone="danger" /> : null}
 
       <Card>
         <CardHeader
@@ -124,11 +132,25 @@ export default async function PatientsPage({
                   Ver detalle
                 </Link>
                 <Link
-                  href={`/treatments/new?patientId=${patient.id}`}
+                  href={`/patients/${patient.id}/edit`}
                   className={buttonStyles({ variant: "secondary" })}
+                >
+                  Editar
+                </Link>
+                <Link
+                  href={`/treatments/new?patientId=${patient.id}`}
+                  className={buttonStyles({ variant: "ghost" })}
                 >
                   Nuevo tratamiento
                 </Link>
+                <DeletePatientForm
+                  patientId={patient.id}
+                  patientName={`${patient.firstName} ${patient.lastName}`}
+                  treatmentCount={patient.treatments.length}
+                  appointmentCount={patient._count.appointments}
+                  photoCount={patient._count.photos}
+                  action={deletePatientAction}
+                />
               </div>
             </Card>
           ))

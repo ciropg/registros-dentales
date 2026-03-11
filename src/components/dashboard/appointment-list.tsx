@@ -34,7 +34,7 @@ export function AppointmentList({
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="font-semibold text-foreground">{appointment.patientName}</p>
-                  <p className="mt-1 text-sm text-muted">{appointment.reason}</p>
+                  <p className="mt-1 text-sm text-muted">{appointment.reason || "Sin motivo registrado."}</p>
                   <p className="mt-2 text-sm text-muted">{formatDateTime(appointment.scheduledAt)}</p>
                 </div>
                 <Badge tone={appointment.statusTone}>{appointment.statusLabel}</Badge>

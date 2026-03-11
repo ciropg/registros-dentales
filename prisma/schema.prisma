@@ -86,6 +86,7 @@ model Patient {
 
   @@index([isDemo])
   @@unique([documentNumber, isDemo])
+  @@unique([firstName, lastName, isDemo])
 }
 
 model Treatment {

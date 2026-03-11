@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/topbar";
+import { DeletePatientForm } from "@/components/patients/delete-patient-form";
 import { PatientPhotoUploadForm } from "@/components/patients/patient-photo-upload-form";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,7 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDate, formatDateTime } from "@/lib/date";
 import { toSearchParam } from "@/lib/utils";
-import { deletePatientPhotoAction, uploadPatientPhotoAction } from "@/modules/patients/actions";
+import { deletePatientAction, deletePatientPhotoAction, uploadPatientPhotoAction } from "@/modules/patients/actions";
 import { getPatientDetail } from "@/modules/patients/queries";
 
 export default async function PatientDetailPage({
@@ -41,6 +42,9 @@ export default async function PatientDetailPage({
         description="Ficha del paciente con tratamientos vinculados, avance por fases e historial de citas."
         action={
           <div className="flex flex-wrap gap-3">
+            <Link href={`/patients/${patient.id}/edit`} className={buttonStyles({ variant: "secondary" })}>
+              Editar paciente
+            </Link>
             <Link
               href={`/treatments/new?patientId=${patient.id}`}
               className={buttonStyles({ variant: "secondary" })}
@@ -50,6 +54,14 @@ export default async function PatientDetailPage({
             <Link href={`/appointments/new?patientId=${patient.id}`} className={buttonStyles({})}>
               Nueva cita
             </Link>
+            <DeletePatientForm
+              patientId={patient.id}
+              patientName={`${patient.firstName} ${patient.lastName}`}
+              treatmentCount={patient.treatments.length}
+              appointmentCount={patient.appointments.length}
+              photoCount={patient.photos.length}
+              action={deletePatientAction}
+            />
           </div>
         }
       />
@@ -101,7 +113,9 @@ export default async function PatientDetailPage({
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
                       <p className="text-xl text-foreground">{treatment.title}</p>
-                      <p className="mt-2 text-sm leading-6 text-muted">{treatment.diagnosis}</p>
+                      <p className="mt-2 text-sm leading-6 text-muted">
+                        {treatment.diagnosis || "Sin diagnostico clinico registrado."}
+                      </p>
                       <p className="mt-2 text-sm text-muted">
                         Responsable: {treatment.dentist?.name ?? "Sin asignar"}
                       </p>
@@ -243,7 +257,7 @@ export default async function PatientDetailPage({
               <div key={appointment.id} className="rounded-2xl border border-line bg-white/70 px-4 py-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="font-semibold text-foreground">{appointment.reason}</p>
+                    <p className="font-semibold text-foreground">{appointment.reason || "Sin motivo registrado."}</p>
                     <p className="mt-1 text-sm text-muted">{formatDateTime(appointment.scheduledAt)}</p>
                   </div>
                   <Badge tone={appointmentStatusTone(appointment.status)}>

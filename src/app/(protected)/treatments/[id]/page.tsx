@@ -83,7 +83,9 @@ export default async function TreatmentDetailPage({
             </Badge>
           </div>
 
-          <p className="mt-6 text-sm leading-7 text-muted">{treatment.diagnosis}</p>
+          <p className="mt-6 text-sm leading-7 text-muted">
+            {treatment.diagnosis || "Sin diagnostico clinico registrado."}
+          </p>
 
           <dl className="mt-6 grid gap-3 text-sm">
             <div className="rounded-2xl bg-violet-50/80 px-4 py-4">
@@ -220,7 +222,7 @@ export default async function TreatmentDetailPage({
                 <div key={appointment.id} className="rounded-3xl border border-line bg-white/70 p-5">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <p className="font-semibold text-foreground">{appointment.reason}</p>
+                      <p className="font-semibold text-foreground">{appointment.reason || "Sin motivo registrado."}</p>
                       <p className="mt-1 text-sm text-muted">{formatDateTime(appointment.scheduledAt)}</p>
                       <p className="mt-1 text-sm text-muted">{appointment.notes ?? "Sin notas."}</p>
                     </div>

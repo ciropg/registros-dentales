@@ -1,14 +1,67 @@
 import { AppointmentStatus, TreatmentStatus } from "@prisma/client";
+import { endOfDay, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 
-export async function listAppointments(isDemo: boolean, status?: string) {
+function getDateRange(date: string | undefined) {
+  if (!date) {
+    return undefined;
+  }
+
+  const normalizedDate = new Date(`${date}T00:00:00`);
+
+  if (Number.isNaN(normalizedDate.getTime())) {
+    return undefined;
+  }
+
+  return {
+    gte: startOfDay(normalizedDate),
+    lte: endOfDay(normalizedDate),
+  };
+}
+
+function compareAppointmentsByProximity(
+  left: { scheduledAt: Date },
+  right: { scheduledAt: Date },
+  referenceTime: number,
+) {
+  const leftTime = left.scheduledAt.getTime();
+  const rightTime = right.scheduledAt.getTime();
+  const leftDistance = Math.abs(leftTime - referenceTime);
+  const rightDistance = Math.abs(rightTime - referenceTime);
+
+  if (leftDistance !== rightDistance) {
+    return leftDistance - rightDistance;
+  }
+
+  const leftIsFuture = leftTime >= referenceTime;
+  const rightIsFuture = rightTime >= referenceTime;
+
+  if (leftIsFuture !== rightIsFuture) {
+    return leftIsFuture ? -1 : 1;
+  }
+
+  return leftTime - rightTime;
+}
+
+export async function listAppointments(
+  isDemo: boolean,
+  status?: string,
+  date?: string,
+  sortByProximity = false,
+) {
   const normalizedStatus = Object.values(AppointmentStatus).includes(status as AppointmentStatus)
     ? (status as AppointmentStatus)
     : undefined;
+  const scheduledAt = getDateRange(date);
 
-  return prisma.appointment.findMany({
+  const appointments = await prisma.appointment.findMany({
     where: {
       isDemo,
+      ...(scheduledAt
+        ? {
+            scheduledAt,
+          }
+        : {}),
       ...(normalizedStatus
         ? {
             status: normalizedStatus,
@@ -33,6 +86,14 @@ export async function listAppointments(isDemo: boolean, status?: string) {
       },
     },
   });
+
+  if (!sortByProximity) {
+    return appointments;
+  }
+
+  const referenceTime = Date.now();
+
+  return [...appointments].sort((left, right) => compareAppointmentsByProximity(left, right, referenceTime));
 }
 
 export async function getAppointmentFormOptions(isDemo: boolean) {

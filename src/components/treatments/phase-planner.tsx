@@ -78,7 +78,7 @@ export function PhasePlanner() {
                 onChange={(event) => updatePhase(index, "weight", event.target.value)}
               />
             </Field>
-            <Field label="Fecha planificada">
+            <Field label="Fecha planificada" hint="Opcional.">
               <input
                 className={inputClassName}
                 type="date"

@@ -70,7 +70,7 @@ export async function createAppointmentAction(formData: FormData) {
       patientId: patient.id,
       treatmentId,
       scheduledAt: new Date(parsed.data.scheduledAt),
-      reason: parsed.data.reason,
+      reason: parsed.data.reason ?? "",
       notes: parsed.data.notes,
       isDemo: user.isDemo,
     },
