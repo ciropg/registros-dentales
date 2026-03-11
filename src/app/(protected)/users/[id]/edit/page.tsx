@@ -18,16 +18,14 @@ export default async function EditUserPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const actor = await requireBaseRole(["ADMIN"]);
-  const [{ id }, query, roles] = await Promise.all([
-    params,
-    searchParams,
-    getManagedRoleOptions(actor.isDemo),
-  ]);
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   const user = await getManagedUserDetail(id, actor.isDemo);
 
   if (!user) {
     notFound();
   }
+
+  const roles = await getManagedRoleOptions(user.isDemo);
 
   const error = toSearchParam(query.error);
 
@@ -35,7 +33,11 @@ export default async function EditUserPage({
     <main className="space-y-6 py-4 lg:py-8">
       <Topbar
         title={`Editar ${user.name}`}
-        description="Actualiza los datos del usuario sin salir de su entorno administrativo."
+        description={
+          actor.isDemo
+            ? "Actualiza los datos del usuario sin salir del entorno demo."
+            : "Actualiza los datos del usuario dentro de tu alcance administrativo sin cambiar su entorno."
+        }
         action={
           <Link href={`/users/${user.id}`} className={buttonStyles({ variant: "secondary" })}>
             Volver al detalle

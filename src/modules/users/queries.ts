@@ -4,11 +4,14 @@ import {
   getRoleLabel,
   getRoleSortOrder,
 } from "@/lib/roles";
+import { getManagedRoleScopeWhere, getManagedUserScopeWhere } from "@/modules/users/scope";
 
-export async function listManagedUsers(isDemo: boolean) {
+export async function listManagedUsers(actorIsDemo: boolean) {
+  const scopeWhere = getManagedUserScopeWhere(actorIsDemo);
+
   const [users, totalCount, activeCount] = await Promise.all([
     prisma.user.findMany({
-      where: { isDemo },
+      where: scopeWhere,
       orderBy: [{ active: "desc" }, { name: "asc" }],
       select: {
         id: true,
@@ -21,10 +24,13 @@ export async function listManagedUsers(isDemo: boolean) {
       },
     }),
     prisma.user.count({
-      where: { isDemo },
+      where: scopeWhere,
     }),
     prisma.user.count({
-      where: { isDemo, active: true },
+      where: {
+        ...scopeWhere,
+        active: true,
+      },
     }),
   ]);
 
@@ -42,11 +48,11 @@ export async function listManagedUsers(isDemo: boolean) {
   };
 }
 
-export async function getManagedUserDetail(userId: string, isDemo: boolean) {
+export async function getManagedUserDetail(userId: string, actorIsDemo: boolean) {
   const user = await prisma.user.findFirst({
     where: {
       id: userId,
-      isDemo,
+      ...getManagedUserScopeWhere(actorIsDemo),
     },
     select: {
       id: true,
@@ -77,15 +83,24 @@ export async function getManagedUserDetail(userId: string, isDemo: boolean) {
   };
 }
 
-export async function getManagedRoleOptions(isDemo: boolean) {
+export async function getManagedRoleOptions(actorIsDemo: boolean) {
   const roles = await prisma.role.findMany({
-    where: { isDemo },
+    where: getManagedRoleScopeWhere(actorIsDemo),
     select: {
       code: true,
       name: true,
       description: true,
+      isDemo: true,
     },
   });
 
-  return roles.sort((left, right) => getRoleSortOrder(left.code) - getRoleSortOrder(right.code));
+  return roles.sort((left, right) => {
+    const roleOrder = getRoleSortOrder(left.code) - getRoleSortOrder(right.code);
+
+    if (roleOrder !== 0) {
+      return roleOrder;
+    }
+
+    return Number(left.isDemo) - Number(right.isDemo);
+  });
 }

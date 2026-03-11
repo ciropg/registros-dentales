@@ -16,10 +16,10 @@ export default async function NewUserPage({
   const actor = await requireBaseRole(["ADMIN"]);
   const [params, roles] = await Promise.all([searchParams, getManagedRoleOptions(actor.isDemo)]);
   const error = toSearchParam(params.error);
-  const title = actor.isDemo ? "Nuevo usuario demo" : "Nuevo usuario real";
+  const title = actor.isDemo ? "Nuevo usuario demo" : "Nuevo usuario";
   const description = actor.isDemo
     ? "Crea una cuenta demo y asigna solo roles demo dentro de este entorno."
-    : "Crea una cuenta real y asigna solo roles reales dentro de este entorno.";
+    : "Crea una cuenta real o demo. El entorno se define por el rol seleccionado.";
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
@@ -30,8 +30,9 @@ export default async function NewUserPage({
           {error ? <Alert message={error} tone="danger" /> : null}
 
           <div className="rounded-3xl border border-brand/15 bg-brand/5 p-4 text-sm text-foreground">
-            Esta cuenta quedara creada en el entorno {actor.isDemo ? "demo" : "real"} y no podra
-            cruzarse con usuarios del otro entorno.
+            {actor.isDemo
+              ? "Esta cuenta quedara creada en el entorno demo y solo puede usar roles demo."
+              : "Como administrador real puedes crear cuentas reales o demo. El rol elegido define el entorno final."}
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">

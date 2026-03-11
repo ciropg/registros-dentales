@@ -21,10 +21,10 @@ export default async function UsersPage({
   const [params, data] = await Promise.all([searchParams, listManagedUsers(actor.isDemo)]);
   const success = toSearchParam(params.success);
   const error = toSearchParam(params.error);
-  const title = actor.isDemo ? "Usuarios demo" : "Usuarios reales";
+  const title = actor.isDemo ? "Usuarios demo" : "Usuarios";
   const description = actor.isDemo
     ? "Gestiona exclusivamente cuentas demo y evita el cruce con usuarios reales."
-    : "Gestiona exclusivamente cuentas reales y evita el cruce con usuarios demo.";
+    : "Como administrador real puedes gestionar cuentas reales y demo desde un solo lugar.";
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
@@ -45,7 +45,7 @@ export default async function UsersPage({
         <MetricCard
           label="Total"
           value={data.stats.totalCount}
-          helper="Usuarios visibles dentro de este entorno."
+          helper={actor.isDemo ? "Usuarios visibles dentro del entorno demo." : "Usuarios visibles dentro de tu alcance administrativo."}
         />
         <MetricCard
           label="Activos"
@@ -63,7 +63,11 @@ export default async function UsersPage({
         <CardHeader
           eyebrow="Gestion"
           title="Listado de usuarios"
-          description="Solo se muestran usuarios del mismo entorno que el administrador actual."
+          description={
+            actor.isDemo
+              ? "Solo se muestran usuarios demo."
+              : "Se muestran usuarios reales y demo para gestion centralizada."
+          }
         />
 
         <div className="mt-6 space-y-4">
@@ -125,7 +129,11 @@ export default async function UsersPage({
           ) : (
             <EmptyState
               title="Sin usuarios registrados"
-              description="Crea la primera cuenta disponible para este entorno."
+              description={
+                actor.isDemo
+                  ? "Crea la primera cuenta disponible para el entorno demo."
+                  : "Crea la primera cuenta real o demo disponible para el sistema."
+              }
               action={
                 <Link href="/users/new" className={buttonStyles({})}>
                   Crear usuario

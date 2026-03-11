@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
-import { isRoleAllowedForScope } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
 import {
@@ -13,6 +12,11 @@ import {
   userToggleActiveSchema,
   userUpdateSchema,
 } from "@/modules/users/schemas";
+import {
+  canActorAssignRole,
+  getManagedUserScopeWhere,
+  getUserEnvironmentFromRole,
+} from "@/modules/users/scope";
 
 function revalidateUserPaths(userId?: string) {
   revalidatePath("/users");
@@ -25,21 +29,22 @@ function revalidateUserPaths(userId?: string) {
   }
 }
 
-async function getManagedUserOrRedirect(userId: string, isDemo: boolean, redirectPath: string) {
+async function getManagedUserOrRedirect(userId: string, actorIsDemo: boolean, redirectPath: string) {
   const user = await prisma.user.findFirst({
     where: {
       id: userId,
-      isDemo,
+      ...getManagedUserScopeWhere(actorIsDemo),
     },
     select: {
       id: true,
       name: true,
       active: true,
+      isDemo: true,
     },
   });
 
   if (!user) {
-    redirect(`${redirectPath}${buildErrorSearch("Ese usuario no existe en tu entorno.")}`);
+    redirect(`${redirectPath}${buildErrorSearch("No tienes acceso a ese usuario.")}`);
   }
 
   return user;
@@ -59,9 +64,11 @@ export async function createUserAction(formData: FormData) {
     redirect(`/users/new${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo crear el usuario.")}`);
   }
 
-  if (!isRoleAllowedForScope(parsed.data.role, actor.isDemo)) {
-    redirect(`/users/new${buildErrorSearch("Solo puedes asignar roles de tu entorno.")}`);
+  if (!canActorAssignRole(actor.isDemo, parsed.data.role)) {
+    redirect(`/users/new${buildErrorSearch("Solo puedes asignar roles demo desde una cuenta demo.")}`);
   }
+
+  const targetIsDemo = getUserEnvironmentFromRole(parsed.data.role);
 
   try {
     const user = await prisma.user.create({
@@ -69,7 +76,7 @@ export async function createUserAction(formData: FormData) {
         name: parsed.data.name,
         email: parsed.data.email,
         role: parsed.data.role,
-        isDemo: actor.isDemo,
+        isDemo: targetIsDemo,
         passwordHash: await bcrypt.hash(parsed.data.password, 10),
       },
     });
@@ -104,11 +111,17 @@ export async function updateUserAction(formData: FormData) {
     redirect(`/users${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo actualizar el usuario.")}`);
   }
 
-  if (!isRoleAllowedForScope(parsed.data.role, actor.isDemo)) {
-    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch("Solo puedes asignar roles de tu entorno.")}`);
+  if (!canActorAssignRole(actor.isDemo, parsed.data.role)) {
+    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch("Solo puedes asignar roles demo desde una cuenta demo.")}`);
   }
 
-  await getManagedUserOrRedirect(parsed.data.userId, actor.isDemo, "/users");
+  const managedUser = await getManagedUserOrRedirect(parsed.data.userId, actor.isDemo, "/users");
+
+  const targetIsDemo = getUserEnvironmentFromRole(parsed.data.role);
+
+  if (managedUser.isDemo !== targetIsDemo) {
+    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch("No se puede cambiar el entorno de un usuario existente.")}`);
+  }
 
   try {
     const user = await prisma.user.update({
@@ -117,7 +130,7 @@ export async function updateUserAction(formData: FormData) {
         name: parsed.data.name,
         email: parsed.data.email,
         role: parsed.data.role,
-        isDemo: actor.isDemo,
+        isDemo: targetIsDemo,
         ...(parsed.data.password
           ? {
               passwordHash: await bcrypt.hash(parsed.data.password, 10),

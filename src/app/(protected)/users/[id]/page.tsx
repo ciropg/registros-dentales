@@ -33,7 +33,11 @@ export default async function UserDetailPage({
     <main className="space-y-6 py-4 lg:py-8">
       <Topbar
         title={user.name}
-        description="Detalle del usuario dentro del mismo entorno administrativo."
+        description={
+          actor.isDemo
+            ? "Detalle del usuario dentro del entorno demo."
+            : "Detalle del usuario dentro de tu alcance administrativo."
+        }
         action={
           <div className="flex flex-wrap gap-3">
             <Link href="/users" className={buttonStyles({ variant: "secondary" })}>
