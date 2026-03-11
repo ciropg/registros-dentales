@@ -2,12 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/topbar";
+import { PatientPhotoUploadForm } from "@/components/patients/patient-photo-upload-form";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
 import { requireUser } from "@/lib/auth";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
@@ -172,30 +172,7 @@ export default async function PatientDetailPage({
               : "Adjunta fotos clinicas del paciente y conservalas en el entorno real."
           }
           action={
-            <form action={uploadPatientPhotoAction} className="grid gap-3 md:grid-cols-[1fr_1.2fr_auto]">
-              <input type="hidden" name="patientId" value={patient.id} />
-              <Field label="Nueva foto">
-                <input
-                  className={inputClassName}
-                  type="file"
-                  name="photo"
-                  accept="image/*"
-                  required
-                />
-              </Field>
-              <Field label="Descripcion" hint="Opcional. Ayuda a identificar la foto en la ficha del paciente.">
-                <textarea
-                  className={textareaClassName}
-                  name="description"
-                  rows={3}
-                  maxLength={500}
-                  placeholder="Ejemplo: Radiografia inicial o control postoperatorio"
-                />
-              </Field>
-              <button type="submit" className={buttonStyles({ className: "self-end" })}>
-                Subir foto
-              </button>
-            </form>
+            <PatientPhotoUploadForm patientId={patient.id} action={uploadPatientPhotoAction} />
           }
         />
 
