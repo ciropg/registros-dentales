@@ -47,10 +47,21 @@ export default async function LoginPage({
           Usa las credenciales sembradas para entrar al panel y revisar el flujo completo.
         </p>
 
-        <div className="mt-6 rounded-3xl border border-brand/15 bg-brand/5 p-4 text-sm text-foreground">
-          <p className="font-semibold">Demo</p>
-          <p className="mt-2">admin@clinic.local / Admin123!</p>
-          <p className="mt-1">dentista@clinic.local / Dentista123!</p>
+        <div className="mt-6 grid gap-4 rounded-3xl border border-brand/15 bg-brand/5 p-4 text-sm text-foreground md:grid-cols-2">
+          <div>
+            <p className="font-semibold">Entorno real</p>
+            <p className="mt-2">admin@clinic.local / Admin123!</p>
+            <p className="mt-1">dentista@clinic.local / Dentista123!</p>
+            <p className="mt-1">asistente@clinic.local / Asistente123!</p>
+            <p className="mt-1">recepcion@clinic.local / Recepcion123!</p>
+          </div>
+          <div>
+            <p className="font-semibold">Entorno demo</p>
+            <p className="mt-2">demo.admin@clinic.local / DemoAdmin123!</p>
+            <p className="mt-1">demo.dentista@clinic.local / DemoDentista123!</p>
+            <p className="mt-1">demo.asistente@clinic.local / DemoAsistente123!</p>
+            <p className="mt-1">demo.recepcion@clinic.local / DemoRecepcion123!</p>
+          </div>
         </div>
 
         <form action={loginAction} className="mt-8 space-y-5">

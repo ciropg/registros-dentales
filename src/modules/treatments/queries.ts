@@ -1,5 +1,5 @@
-import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getConcreteRolesForBaseRoles } from "@/lib/roles";
 import { treatmentDetailInclude, calculateTreatmentMetrics } from "@/modules/treatments/calculators";
 
 export async function getTreatmentDetail(treatmentId: string) {
@@ -18,7 +18,7 @@ export async function getTreatmentDetail(treatmentId: string) {
   };
 }
 
-export async function getTreatmentFormOptions() {
+export async function getTreatmentFormOptions(isDemo: boolean) {
   const [patients, dentists] = await Promise.all([
     prisma.patient.findMany({
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -31,8 +31,9 @@ export async function getTreatmentFormOptions() {
     prisma.user.findMany({
       where: {
         role: {
-          in: [UserRole.DENTIST, UserRole.ADMIN],
+          in: getConcreteRolesForBaseRoles(["ADMIN", "DENTIST"]),
         },
+        isDemo,
         active: true,
       },
       orderBy: {

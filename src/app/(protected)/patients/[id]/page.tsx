@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/topbar";
@@ -6,10 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Field, inputClassName } from "@/components/ui/field";
+import { requireUser } from "@/lib/auth";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDate, formatDateTime } from "@/lib/date";
 import { toSearchParam } from "@/lib/utils";
+import { uploadPatientPhotoAction } from "@/modules/patients/actions";
 import { getPatientDetail } from "@/modules/patients/queries";
 
 export default async function PatientDetailPage({
@@ -19,8 +23,9 @@ export default async function PatientDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const viewer = await requireUser();
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const patient = await getPatientDetail(id);
+  const patient = await getPatientDetail(id, viewer.isDemo);
 
   if (!patient) {
     notFound();
@@ -156,6 +161,72 @@ export default async function PatientDetailPage({
           </div>
         </Card>
       </section>
+
+      <Card>
+        <CardHeader
+          eyebrow="Fotos"
+          title="Adjuntos del paciente"
+          description={
+            viewer.isDemo
+              ? `Espacio compartido demo: ${patient.photoUsageCount}/5 fotos en uso. Al subir una nueva, se elimina la foto demo mas antigua si el limite ya esta lleno.`
+              : "Adjunta fotos clinicas del paciente y conservalas en el entorno real."
+          }
+          action={
+            <form action={uploadPatientPhotoAction} className="grid gap-3 md:grid-cols-[1fr_auto]">
+              <input type="hidden" name="patientId" value={patient.id} />
+              <Field label="Nueva foto">
+                <input
+                  className={inputClassName}
+                  type="file"
+                  name="photo"
+                  accept="image/*"
+                  required
+                />
+              </Field>
+              <button type="submit" className={buttonStyles({ className: "self-end" })}>
+                Subir foto
+              </button>
+            </form>
+          }
+        />
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {patient.photos.length ? (
+            patient.photos.map((photo) => (
+              <div key={photo.id} className="overflow-hidden rounded-3xl border border-line bg-white/70">
+                <div className="relative aspect-square">
+                  <Image
+                    src={photo.secureUrl}
+                    alt={`Foto de ${patient.firstName} ${patient.lastName}`}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                  />
+                </div>
+                <div className="space-y-2 p-4 text-sm">
+                  <p className="font-semibold text-foreground">{photo.originalFilename ?? "Foto clinica"}</p>
+                  <p className="text-muted">Subida: {formatDateTime(photo.createdAt)}</p>
+                  <a
+                    href={photo.secureUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex text-sm font-semibold text-brand"
+                  >
+                    Abrir original
+                  </a>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="md:col-span-2 xl:col-span-3">
+              <EmptyState
+                title="Sin fotos adjuntas"
+                description="Todavia no hay imagenes asociadas a este paciente en tu entorno."
+              />
+            </div>
+          )}
+        </div>
+      </Card>
 
       <Card>
         <CardHeader

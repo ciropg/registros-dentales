@@ -1,9 +1,8 @@
 "use server";
 
-import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
@@ -13,12 +12,7 @@ import {
 } from "@/modules/appointments/schemas";
 
 export async function createAppointmentAction(formData: FormData) {
-  const user = await requireRole([
-    UserRole.ADMIN,
-    UserRole.DENTIST,
-    UserRole.ASSISTANT,
-    UserRole.RECEPTIONIST,
-  ]);
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
 
   const parsed = appointmentCreateSchema.safeParse({
     patientId: formData.get("patientId"),
@@ -57,12 +51,7 @@ export async function createAppointmentAction(formData: FormData) {
 }
 
 export async function updateAppointmentStatusAction(formData: FormData) {
-  const user = await requireRole([
-    UserRole.ADMIN,
-    UserRole.DENTIST,
-    UserRole.ASSISTANT,
-    UserRole.RECEPTIONIST,
-  ]);
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
 
   const parsed = appointmentStatusUpdateSchema.safeParse({
     appointmentId: formData.get("appointmentId"),

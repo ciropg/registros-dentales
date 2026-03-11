@@ -12,6 +12,10 @@ enum UserRole {
   DENTIST
   ASSISTANT
   RECEPTIONIST
+  DEMO_ADMIN
+  DEMO_DENTIST
+  DEMO_ASSISTANT
+  DEMO_RECEPTIONIST
 }
 
 
@@ -43,21 +47,25 @@ model Role {
   code        UserRole @unique
   name        String
   description String?
+  isDemo      Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
 model User {
-  id         String      @id @default(cuid())
-  name       String
-  email      String      @unique
+  id           String      @id @default(cuid())
+  name         String
+  email        String      @unique
   passwordHash String
-  role       UserRole
-  active     Boolean     @default(true)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  treatments Treatment[] @relation("DentistTreatments")
-  auditLogs  AuditLog[]
+  role         UserRole
+  isDemo       Boolean     @default(false)
+  active       Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  treatments   Treatment[] @relation("DentistTreatments")
+  auditLogs    AuditLog[]
+
+  @@index([isDemo])
 }
 
 model Patient {
@@ -73,6 +81,7 @@ model Patient {
   updatedAt      DateTime      @updatedAt
   treatments     Treatment[]
   appointments   Appointment[]
+  photos         PatientPhoto[]
 }
 
 model Treatment {
@@ -151,4 +160,22 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+model PatientPhoto {
+  id               String   @id @default(cuid())
+  patientId        String
+  publicId         String   @unique
+  secureUrl        String
+  originalFilename String?
+  width            Int?
+  height           Int?
+  bytes            Int?
+  format           String?
+  isDemo           Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  patient          Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, isDemo, createdAt])
+  @@index([isDemo, createdAt])
 }

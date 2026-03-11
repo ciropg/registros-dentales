@@ -46,40 +46,55 @@ export async function listPatients(search?: string) {
   });
 }
 
-export async function getPatientDetail(patientId: string) {
-  const patient = await prisma.patient.findUnique({
-    where: { id: patientId },
-    include: {
-      treatments: {
-        include: {
-          dentist: {
-            select: {
-              id: true,
-              name: true,
+export async function getPatientDetail(patientId: string, isDemo: boolean) {
+  const [patient, photoUsageCount] = await Promise.all([
+    prisma.patient.findUnique({
+      where: { id: patientId },
+      include: {
+        treatments: {
+          include: {
+            dentist: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            phases: {
+              orderBy: {
+                phaseOrder: "asc",
+              },
+            },
+            appointments: {
+              orderBy: {
+                scheduledAt: "desc",
+              },
             },
           },
-          phases: {
-            orderBy: {
-              phaseOrder: "asc",
-            },
-          },
-          appointments: {
-            orderBy: {
-              scheduledAt: "desc",
-            },
+          orderBy: {
+            createdAt: "desc",
           },
         },
-        orderBy: {
-          createdAt: "desc",
+        appointments: {
+          orderBy: {
+            scheduledAt: "desc",
+          },
+        },
+        photos: {
+          where: {
+            isDemo,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
         },
       },
-      appointments: {
-        orderBy: {
-          scheduledAt: "desc",
-        },
+    }),
+    prisma.patientPhoto.count({
+      where: {
+        isDemo,
       },
-    },
-  });
+    }),
+  ]);
 
   if (!patient) {
     return null;
@@ -87,6 +102,7 @@ export async function getPatientDetail(patientId: string) {
 
   return {
     ...patient,
+    photoUsageCount,
     treatments: patient.treatments.map((treatment) => ({
       ...treatment,
       metrics: calculateTreatmentMetrics(treatment),

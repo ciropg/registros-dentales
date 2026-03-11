@@ -1,9 +1,9 @@
 "use server";
 
-import { PhaseStatus, TreatmentStatus, UserRole } from "@prisma/client";
+import { PhaseStatus, TreatmentStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
@@ -13,7 +13,7 @@ import {
 } from "@/modules/treatments/schemas";
 
 export async function createTreatmentAction(formData: FormData) {
-  const user = await requireRole([UserRole.ADMIN, UserRole.DENTIST, UserRole.ASSISTANT]);
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT"]);
 
   let parsedPhases: unknown[] = [];
 
@@ -79,7 +79,7 @@ export async function createTreatmentAction(formData: FormData) {
 }
 
 export async function updatePhaseStatusAction(formData: FormData) {
-  const user = await requireRole([UserRole.ADMIN, UserRole.DENTIST, UserRole.ASSISTANT]);
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT"]);
 
   const parsed = treatmentPhaseUpdateSchema.safeParse({
     treatmentId: formData.get("treatmentId"),

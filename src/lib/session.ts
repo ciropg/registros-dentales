@@ -1,8 +1,10 @@
+import { type UserRole } from "@prisma/client";
 import { SignJWT, jwtVerify } from "jose";
 
 export type SessionPayload = {
   userId: string;
-  role: string;
+  role: UserRole;
+  isDemo: boolean;
   email: string;
   name: string;
 };

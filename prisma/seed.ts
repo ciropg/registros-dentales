@@ -1,6 +1,12 @@
 import { AppointmentStatus, PhaseStatus, TreatmentStatus, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { addDays, subDays } from "date-fns";
+import {
+  getAllUserRoles,
+  getRoleDescription,
+  getRoleLabel,
+  isDemoRole,
+} from "../src/lib/roles";
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
@@ -13,60 +19,93 @@ async function main() {
   await prisma.role.deleteMany();
 
   await prisma.role.createMany({
-    data: [
-      {
-        code: UserRole.ADMIN,
-        name: "Administrador",
-        description: "Acceso total al sistema.",
-      },
-      {
-        code: UserRole.DENTIST,
-        name: "Dentista",
-        description: "Gestion clinica de tratamientos y citas.",
-      },
-      {
-        code: UserRole.ASSISTANT,
-        name: "Asistente",
-        description: "Soporte operativo de pacientes, tratamientos y citas.",
-      },
-      {
-        code: UserRole.RECEPTIONIST,
-        name: "Recepcionista",
-        description: "Gestion operativa de pacientes y agenda.",
-      },
-    ],
+    data: getAllUserRoles().map((role) => ({
+      code: role,
+      name: getRoleLabel(role),
+      description: getRoleDescription(role),
+      isDemo: isDemoRole(role),
+    })),
   });
 
-  const adminPassword = await bcrypt.hash("Admin123!", 10);
-  const dentistPassword = await bcrypt.hash("Dentista123!", 10);
-  const assistantPassword = await bcrypt.hash("Asistente123!", 10);
+  const userSeeds = [
+    {
+      name: "Administrador",
+      email: "admin@clinic.local",
+      password: "Admin123!",
+      role: UserRole.ADMIN,
+      isDemo: false,
+    },
+    {
+      name: "Dra. Camila Torres",
+      email: "dentista@clinic.local",
+      password: "Dentista123!",
+      role: UserRole.DENTIST,
+      isDemo: false,
+    },
+    {
+      name: "Lucia Ramos",
+      email: "asistente@clinic.local",
+      password: "Asistente123!",
+      role: UserRole.ASSISTANT,
+      isDemo: false,
+    },
+    {
+      name: "Mariela Soto",
+      email: "recepcion@clinic.local",
+      password: "Recepcion123!",
+      role: UserRole.RECEPTIONIST,
+      isDemo: false,
+    },
+    {
+      name: "Demo Administrador",
+      email: "demo.admin@clinic.local",
+      password: "DemoAdmin123!",
+      role: UserRole.DEMO_ADMIN,
+      isDemo: true,
+    },
+    {
+      name: "Demo Dra. Carla Vega",
+      email: "demo.dentista@clinic.local",
+      password: "DemoDentista123!",
+      role: UserRole.DEMO_DENTIST,
+      isDemo: true,
+    },
+    {
+      name: "Demo Paula Rios",
+      email: "demo.asistente@clinic.local",
+      password: "DemoAsistente123!",
+      role: UserRole.DEMO_ASSISTANT,
+      isDemo: true,
+    },
+    {
+      name: "Demo Ana Perez",
+      email: "demo.recepcion@clinic.local",
+      password: "DemoRecepcion123!",
+      role: UserRole.DEMO_RECEPTIONIST,
+      isDemo: true,
+    },
+  ];
 
-  const [admin, dentist, assistant] = await Promise.all([
-    prisma.user.create({
-      data: {
-        name: "Administrador",
-        email: "admin@clinic.local",
-        passwordHash: adminPassword,
-        role: UserRole.ADMIN,
-      },
-    }),
-    prisma.user.create({
-      data: {
-        name: "Dra. Camila Torres",
-        email: "dentista@clinic.local",
-        passwordHash: dentistPassword,
-        role: UserRole.DENTIST,
-      },
-    }),
-    prisma.user.create({
-      data: {
-        name: "Lucia Ramos",
-        email: "asistente@clinic.local",
-        passwordHash: assistantPassword,
-        role: UserRole.ASSISTANT,
-      },
-    }),
-  ]);
+  const createdUsers = await Promise.all(
+    userSeeds.map(async (user) =>
+      prisma.user.create({
+        data: {
+          name: user.name,
+          email: user.email,
+          passwordHash: await bcrypt.hash(user.password, 10),
+          role: user.role,
+          isDemo: user.isDemo,
+        },
+      }),
+    ),
+  );
+
+  const admin = createdUsers.find((user) => user.role === UserRole.ADMIN);
+  const dentist = createdUsers.find((user) => user.role === UserRole.DENTIST);
+
+  if (!admin || !dentist) {
+    throw new Error("No se pudieron crear los usuarios base para el seed.");
+  }
 
   const patientOne = await prisma.patient.create({
     data: {
@@ -249,6 +288,11 @@ async function main() {
   console.log("Admin: admin@clinic.local / Admin123!");
   console.log("Dentista: dentista@clinic.local / Dentista123!");
   console.log("Asistente: asistente@clinic.local / Asistente123!");
+  console.log("Recepcionista: recepcion@clinic.local / Recepcion123!");
+  console.log("Demo admin: demo.admin@clinic.local / DemoAdmin123!");
+  console.log("Demo dentista: demo.dentista@clinic.local / DemoDentista123!");
+  console.log("Demo asistente: demo.asistente@clinic.local / DemoAsistente123!");
+  console.log("Demo recepcionista: demo.recepcion@clinic.local / DemoRecepcion123!");
 }
 
 main()

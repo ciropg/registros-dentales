@@ -6,7 +6,9 @@ export function AppShell({
 }: {
   user: {
     name: string;
-    role: string;
+    roleLabel: string;
+    environmentLabel: string;
+    canManageUsers: boolean;
   };
   children: React.ReactNode;
 }) {

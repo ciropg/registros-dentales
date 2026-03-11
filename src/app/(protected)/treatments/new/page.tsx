@@ -4,6 +4,7 @@ import { Alert } from "@/components/ui/alert";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
+import { requireBaseRole } from "@/lib/auth";
 import { toSearchParam } from "@/lib/utils";
 import { createTreatmentAction } from "@/modules/treatments/actions";
 import { getTreatmentFormOptions } from "@/modules/treatments/queries";
@@ -13,7 +14,8 @@ export default async function NewTreatmentPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [params, options] = await Promise.all([searchParams, getTreatmentFormOptions()]);
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT"]);
+  const [params, options] = await Promise.all([searchParams, getTreatmentFormOptions(user.isDemo)]);
   const patientId = toSearchParam(params.patientId);
   const error = toSearchParam(params.error);
 

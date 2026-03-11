@@ -9,7 +9,9 @@ export function Sidebar({
 }: {
   user: {
     name: string;
-    role: string;
+    roleLabel: string;
+    environmentLabel: string;
+    canManageUsers: boolean;
   };
 }) {
   return (
@@ -24,12 +26,16 @@ export function Sidebar({
         <NavLink href="/dashboard" label="Dashboard" />
         <NavLink href="/patients" label="Pacientes" />
         <NavLink href="/appointments" label="Citas" />
+        {user.canManageUsers ? <NavLink href="/users" label="Usuarios" /> : null}
       </nav>
 
       <div className="mt-auto rounded-3xl border border-line bg-white/60 p-4">
         <p className="text-sm font-semibold text-foreground">{user.name}</p>
-        <div className="mt-2">
-          <Badge tone="brand">{user.role}</Badge>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Badge tone="brand">{user.roleLabel}</Badge>
+          <Badge tone={user.environmentLabel === "Demo" ? "warning" : "neutral"}>
+            {user.environmentLabel}
+          </Badge>
         </div>
         <form action={logoutAction} className="mt-4">
           <Button type="submit" variant="secondary" className="w-full">
