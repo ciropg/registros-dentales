@@ -6,6 +6,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { inputClassName } from "@/components/ui/field";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { requireUser } from "@/lib/auth";
 import { daysLabel, formatDate } from "@/lib/date";
 import { treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { toSearchParam } from "@/lib/utils";
@@ -17,8 +18,9 @@ export default async function PatientsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const user = await requireUser();
   const q = toSearchParam(params.q);
-  const patients = await listPatients(q);
+  const patients = await listPatients(user.isDemo, q);
 
   return (
     <main className="space-y-6 py-4 lg:py-8">

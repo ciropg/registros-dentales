@@ -26,13 +26,53 @@ export async function createAppointmentAction(formData: FormData) {
     redirect(`/appointments/new${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo crear la cita.")}`);
   }
 
+  const patient = await prisma.patient.findFirst({
+    where: {
+      id: parsed.data.patientId,
+      isDemo: user.isDemo,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!patient) {
+    redirect(`/appointments/new${buildErrorSearch("El paciente no existe en tu entorno.")}`);
+  }
+
+  let treatmentId: string | undefined;
+
+  if (parsed.data.treatmentId) {
+    const treatment = await prisma.treatment.findFirst({
+      where: {
+        id: parsed.data.treatmentId,
+        isDemo: user.isDemo,
+      },
+      select: {
+        id: true,
+        patientId: true,
+      },
+    });
+
+    if (!treatment) {
+      redirect(`/appointments/new${buildErrorSearch("El tratamiento no existe en tu entorno.")}`);
+    }
+
+    if (treatment.patientId !== patient.id) {
+      redirect(`/appointments/new${buildErrorSearch("El tratamiento no pertenece al paciente seleccionado.")}`);
+    }
+
+    treatmentId = treatment.id;
+  }
+
   const appointment = await prisma.appointment.create({
     data: {
-      patientId: parsed.data.patientId,
-      treatmentId: parsed.data.treatmentId,
+      patientId: patient.id,
+      treatmentId,
       scheduledAt: new Date(parsed.data.scheduledAt),
       reason: parsed.data.reason,
       notes: parsed.data.notes,
+      isDemo: user.isDemo,
     },
   });
 
@@ -63,8 +103,22 @@ export async function updateAppointmentStatusAction(formData: FormData) {
     redirect(`/appointments${buildErrorSearch("No se pudo actualizar el estado de la cita.")}`);
   }
 
+  const existingAppointment = await prisma.appointment.findFirst({
+    where: {
+      id: parsed.data.appointmentId,
+      isDemo: user.isDemo,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existingAppointment) {
+    redirect(`${parsed.data.redirectPath}${buildErrorSearch("La cita no existe en tu entorno.")}`);
+  }
+
   const appointment = await prisma.appointment.update({
-    where: { id: parsed.data.appointmentId },
+    where: { id: existingAppointment.id },
     data: {
       status: parsed.data.status,
     },

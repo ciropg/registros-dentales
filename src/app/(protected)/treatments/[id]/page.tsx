@@ -8,6 +8,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Field, selectClassName } from "@/components/ui/field";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { requireUser } from "@/lib/auth";
 import {
   appointmentStatusLabel,
   appointmentStatusTone,
@@ -32,8 +33,9 @@ export default async function TreatmentDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const user = await requireUser();
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const treatment = await getTreatmentDetail(id);
+  const treatment = await getTreatmentDetail(id, user.isDemo);
 
   if (!treatment) {
     notFound();

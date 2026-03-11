@@ -1,29 +1,39 @@
 import { prisma } from "@/lib/prisma";
 import { calculateTreatmentMetrics } from "@/modules/treatments/calculators";
 
-export async function listPatients(search?: string) {
+export async function listPatients(isDemo: boolean, search?: string) {
   const query = search?.trim();
 
   const patients = await prisma.patient.findMany({
-    where: query
-      ? {
-          OR: [
-            { firstName: { contains: query } },
-            { lastName: { contains: query } },
-            { documentNumber: { contains: query } },
-          ],
-        }
-      : undefined,
+    where: {
+      isDemo,
+      ...(query
+        ? {
+            OR: [
+              { firstName: { contains: query } },
+              { lastName: { contains: query } },
+              { documentNumber: { contains: query } },
+            ],
+          }
+        : {}),
+    },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     include: {
       treatments: {
+        where: {
+          isDemo,
+        },
         include: {
           phases: true,
         },
       },
       _count: {
         select: {
-          appointments: true,
+          appointments: {
+            where: {
+              isDemo,
+            },
+          },
         },
       },
     },
@@ -48,10 +58,16 @@ export async function listPatients(search?: string) {
 
 export async function getPatientDetail(patientId: string, isDemo: boolean) {
   const [patient, photoUsageCount] = await Promise.all([
-    prisma.patient.findUnique({
-      where: { id: patientId },
+    prisma.patient.findFirst({
+      where: {
+        id: patientId,
+        isDemo,
+      },
       include: {
         treatments: {
+          where: {
+            isDemo,
+          },
           include: {
             dentist: {
               select: {
@@ -65,6 +81,9 @@ export async function getPatientDetail(patientId: string, isDemo: boolean) {
               },
             },
             appointments: {
+              where: {
+                isDemo,
+              },
               orderBy: {
                 scheduledAt: "desc",
               },
@@ -75,6 +94,9 @@ export async function getPatientDetail(patientId: string, isDemo: boolean) {
           },
         },
         appointments: {
+          where: {
+            isDemo,
+          },
           orderBy: {
             scheduledAt: "desc",
           },
@@ -110,8 +132,11 @@ export async function getPatientDetail(patientId: string, isDemo: boolean) {
   };
 }
 
-export async function getPatientOptions() {
+export async function getPatientOptions(isDemo: boolean) {
   return prisma.patient.findMany({
+    where: {
+      isDemo,
+    },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: {
       id: true,

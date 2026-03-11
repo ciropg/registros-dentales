@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { getConcreteRolesForBaseRoles } from "@/lib/roles";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
 import {
   treatmentCreateSchema,
@@ -38,6 +39,44 @@ export async function createTreatmentAction(formData: FormData) {
     redirect(`/treatments/new${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo crear el tratamiento.")}`);
   }
 
+  const patient = await prisma.patient.findFirst({
+    where: {
+      id: parsed.data.patientId,
+      isDemo: user.isDemo,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!patient) {
+    redirect(`/treatments/new${buildErrorSearch("El paciente no existe en tu entorno.")}`);
+  }
+
+  let dentistId: string | undefined;
+
+  if (parsed.data.dentistId) {
+    const dentist = await prisma.user.findFirst({
+      where: {
+        id: parsed.data.dentistId,
+        isDemo: user.isDemo,
+        active: true,
+        role: {
+          in: getConcreteRolesForBaseRoles(["ADMIN", "DENTIST"]),
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!dentist) {
+      redirect(`/treatments/new${buildErrorSearch("El responsable no existe en tu entorno.")}`);
+    }
+
+    dentistId = dentist.id;
+  }
+
   const status =
     new Date(parsed.data.startDate) > new Date()
       ? TreatmentStatus.PLANNED
@@ -45,14 +84,15 @@ export async function createTreatmentAction(formData: FormData) {
 
   const treatment = await prisma.treatment.create({
     data: {
-      patientId: parsed.data.patientId,
-      dentistId: parsed.data.dentistId,
+      patientId: patient.id,
+      dentistId,
       title: parsed.data.title,
       diagnosis: parsed.data.diagnosis,
       startDate: new Date(parsed.data.startDate),
       estimatedEndDate: new Date(parsed.data.estimatedEndDate),
       notes: parsed.data.notes,
       status,
+      isDemo: user.isDemo,
       phases: {
         create: parsed.data.phases.map((phase, index) => ({
           name: phase.name,
@@ -91,8 +131,26 @@ export async function updatePhaseStatusAction(formData: FormData) {
     redirect(`/dashboard${buildErrorSearch("No se pudo actualizar la fase.")}`);
   }
 
+  const phase = await prisma.treatmentPhase.findFirst({
+    where: {
+      id: parsed.data.phaseId,
+      treatmentId: parsed.data.treatmentId,
+      treatment: {
+        isDemo: user.isDemo,
+      },
+    },
+    select: {
+      id: true,
+      treatmentId: true,
+    },
+  });
+
+  if (!phase) {
+    redirect(`/dashboard${buildErrorSearch("El tratamiento no existe en tu entorno.")}`);
+  }
+
   await prisma.treatmentPhase.update({
-    where: { id: parsed.data.phaseId },
+    where: { id: phase.id },
     data: {
       status: parsed.data.status,
       completedDate: parsed.data.status === PhaseStatus.COMPLETED ? new Date() : null,
@@ -100,7 +158,7 @@ export async function updatePhaseStatusAction(formData: FormData) {
   });
 
   const phases = await prisma.treatmentPhase.findMany({
-    where: { treatmentId: parsed.data.treatmentId },
+    where: { treatmentId: phase.treatmentId },
     select: { status: true },
   });
 
@@ -109,7 +167,7 @@ export async function updatePhaseStatusAction(formData: FormData) {
   );
 
   await prisma.treatment.update({
-    where: { id: parsed.data.treatmentId },
+    where: { id: phase.treatmentId },
     data: allClosed
       ? {
           status: TreatmentStatus.COMPLETED,
@@ -130,6 +188,6 @@ export async function updatePhaseStatusAction(formData: FormData) {
   });
 
   revalidatePath("/dashboard");
-  revalidatePath(`/treatments/${parsed.data.treatmentId}`);
-  redirect(`/treatments/${parsed.data.treatmentId}${buildSuccessSearch("Fase actualizada.")}`);
+  revalidatePath(`/treatments/${phase.treatmentId}`);
+  redirect(`/treatments/${phase.treatmentId}${buildSuccessSearch("Fase actualizada.")}`);
 }

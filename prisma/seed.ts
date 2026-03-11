@@ -116,6 +116,7 @@ async function main() {
       email: "mario.quispe@email.local",
       birthDate: new Date("1990-03-14"),
       notes: "Paciente con seguimiento ortodontico quincenal.",
+      isDemo: false,
     },
   });
 
@@ -128,6 +129,7 @@ async function main() {
       email: "valeria.sanchez@email.local",
       birthDate: new Date("1988-08-29"),
       notes: "Paciente en rehabilitacion y control periodontal.",
+      isDemo: false,
     },
   });
 
@@ -141,6 +143,7 @@ async function main() {
       estimatedEndDate: addDays(new Date(), 120),
       status: TreatmentStatus.IN_PROGRESS,
       notes: "Se esperan controles cada 15 dias.",
+      isDemo: false,
       phases: {
         create: [
           {
@@ -188,6 +191,7 @@ async function main() {
       estimatedEndDate: addDays(new Date(), 45),
       status: TreatmentStatus.IN_PROGRESS,
       notes: "Priorizar citas de prueba y control oclusal.",
+      isDemo: false,
       phases: {
         create: [
           {
@@ -234,6 +238,7 @@ async function main() {
         status: AppointmentStatus.ATTENDED,
         reason: "Control y ajuste",
         notes: "Sin incidencias.",
+        isDemo: false,
       },
       {
         patientId: patientOne.id,
@@ -241,6 +246,7 @@ async function main() {
         scheduledAt: subDays(new Date(), 15),
         status: AppointmentStatus.NO_SHOW,
         reason: "Control mensual",
+        isDemo: false,
       },
       {
         patientId: patientOne.id,
@@ -248,6 +254,7 @@ async function main() {
         scheduledAt: addDays(new Date(), 2),
         status: AppointmentStatus.SCHEDULED,
         reason: "Control y ajuste",
+        isDemo: false,
       },
       {
         patientId: patientTwo.id,
@@ -255,6 +262,7 @@ async function main() {
         scheduledAt: subDays(new Date(), 7),
         status: AppointmentStatus.ATTENDED,
         reason: "Control de impresiones",
+        isDemo: false,
       },
       {
         patientId: patientTwo.id,
@@ -263,6 +271,7 @@ async function main() {
         status: AppointmentStatus.RESCHEDULED,
         reason: "Prueba clinica",
         notes: "Paciente solicito cambio por viaje.",
+        isDemo: false,
       },
       {
         patientId: patientTwo.id,
@@ -270,6 +279,7 @@ async function main() {
         scheduledAt: addDays(new Date(), 6),
         status: AppointmentStatus.SCHEDULED,
         reason: "Prueba clinica reprogramada",
+        isDemo: false,
       },
     ],
   });

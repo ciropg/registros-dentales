@@ -3,6 +3,7 @@ import { Alert } from "@/components/ui/alert";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
+import { requireUser } from "@/lib/auth";
 import { toSearchParam } from "@/lib/utils";
 import { createAppointmentAction } from "@/modules/appointments/actions";
 import { getAppointmentFormOptions } from "@/modules/appointments/queries";
@@ -12,7 +13,8 @@ export default async function NewAppointmentPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [params, options] = await Promise.all([searchParams, getAppointmentFormOptions()]);
+  const user = await requireUser();
+  const [params, options] = await Promise.all([searchParams, getAppointmentFormOptions(user.isDemo)]);
   const patientId = toSearchParam(params.patientId);
   const treatmentId = toSearchParam(params.treatmentId);
   const error = toSearchParam(params.error);

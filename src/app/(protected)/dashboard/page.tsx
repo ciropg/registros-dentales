@@ -7,10 +7,12 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { daysLabel, formatDate } from "@/lib/date";
+import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/modules/dashboard/queries";
 
 export default async function DashboardPage() {
-  const data = await getDashboardData();
+  const user = await requireUser();
+  const data = await getDashboardData(user.isDemo);
 
   return (
     <main className="space-y-6 py-4 lg:py-8">

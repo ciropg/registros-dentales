@@ -2,9 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { getConcreteRolesForBaseRoles } from "@/lib/roles";
 import { treatmentDetailInclude, calculateTreatmentMetrics } from "@/modules/treatments/calculators";
 
-export async function getTreatmentDetail(treatmentId: string) {
-  const treatment = await prisma.treatment.findUnique({
-    where: { id: treatmentId },
+export async function getTreatmentDetail(treatmentId: string, isDemo: boolean) {
+  const treatment = await prisma.treatment.findFirst({
+    where: {
+      id: treatmentId,
+      isDemo,
+    },
     include: treatmentDetailInclude,
   });
 
@@ -21,6 +24,9 @@ export async function getTreatmentDetail(treatmentId: string) {
 export async function getTreatmentFormOptions(isDemo: boolean) {
   const [patients, dentists] = await Promise.all([
     prisma.patient.findMany({
+      where: {
+        isDemo,
+      },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       select: {
         id: true,

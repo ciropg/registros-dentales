@@ -129,6 +129,7 @@ export async function createPatientAction(formData: FormData) {
     const patient = await prisma.patient.create({
       data: {
         ...parsed.data,
+        isDemo: user.isDemo,
         birthDate: parsed.data.birthDate ? new Date(parsed.data.birthDate) : undefined,
       },
     });
@@ -172,8 +173,11 @@ export async function uploadPatientPhotoAction(formData: FormData) {
     redirect(`${redirectPath}${buildErrorSearch(parsedMetadata.error.issues[0]?.message ?? "No se pudo validar la descripcion de la foto.")}`);
   }
 
-  const patient = await prisma.patient.findUnique({
-    where: { id: patientId },
+  const patient = await prisma.patient.findFirst({
+    where: {
+      id: patientId,
+      isDemo: user.isDemo,
+    },
     select: {
       id: true,
       firstName: true,

@@ -7,6 +7,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, selectClassName } from "@/components/ui/field";
+import { requireUser } from "@/lib/auth";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDateTime } from "@/lib/date";
 import { toSearchParam } from "@/lib/utils";
@@ -21,10 +22,11 @@ export default async function AppointmentsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const user = await requireUser();
   const selectedStatus = toSearchParam(params.status) ?? "ALL";
   const success = toSearchParam(params.success);
   const error = toSearchParam(params.error);
-  const appointments = await listAppointments(selectedStatus === "ALL" ? undefined : selectedStatus);
+  const appointments = await listAppointments(user.isDemo, selectedStatus === "ALL" ? undefined : selectedStatus);
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
