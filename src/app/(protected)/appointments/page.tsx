@@ -15,17 +15,18 @@ import { toSearchParam } from "@/lib/utils";
 import { updateAppointmentStatusAction } from "@/modules/appointments/actions";
 import { listAppointments } from "@/modules/appointments/queries";
 
-const statusFilters: Array<AppointmentStatus | "ALL"> = ["ALL", ...Object.values(AppointmentStatus)];
+const statusFilters = Object.values(AppointmentStatus);
+const defaultStatusFilters = [AppointmentStatus.SCHEDULED, AppointmentStatus.RESCHEDULED];
 
 function buildAppointmentsFilterHref(
-  status: AppointmentStatus | "ALL",
+  statuses: AppointmentStatus[],
   date: string,
   dateScope: "day" | "all",
 ) {
   const params = new URLSearchParams();
 
-  if (status !== "ALL") {
-    params.set("status", status);
+  for (const status of statuses) {
+    params.append("status", status);
   }
 
   if (dateScope === "all") {
@@ -39,6 +40,17 @@ function buildAppointmentsFilterHref(
   return query ? `/appointments?${query}` : "/appointments";
 }
 
+function getSelectedStatuses(statusParam: string | string[] | undefined) {
+  const rawValues = Array.isArray(statusParam) ? statusParam : statusParam ? [statusParam] : [];
+  const normalizedStatuses = rawValues
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter((value): value is AppointmentStatus => statusFilters.includes(value as AppointmentStatus));
+  const uniqueStatuses = [...new Set(normalizedStatuses)];
+
+  return uniqueStatuses.length ? uniqueStatuses : defaultStatusFilters;
+}
+
 export default async function AppointmentsPage({
   searchParams,
 }: {
@@ -47,25 +59,18 @@ export default async function AppointmentsPage({
   const params = await searchParams;
   const user = await requireUser();
   const today = format(new Date(), "yyyy-MM-dd");
-  const statusParam = toSearchParam(params.status);
-  const selectedStatus = statusFilters.includes((statusParam ?? "ALL") as AppointmentStatus | "ALL")
-    ? ((statusParam ?? "ALL") as AppointmentStatus | "ALL")
-    : "ALL";
+  const selectedStatuses = getSelectedStatuses(params.status);
   const dateScope = toSearchParam(params.dateScope) === "all" ? "all" : "day";
   const selectedDate = toSearchParam(params.date) || today;
   const success = toSearchParam(params.success);
   const error = toSearchParam(params.error);
   const appointments = await listAppointments(
     user.isDemo,
-    selectedStatus === "ALL" ? undefined : selectedStatus,
+    selectedStatuses,
     dateScope === "all" ? undefined : selectedDate,
     dateScope === "all",
   );
-  const redirectPath = buildAppointmentsFilterHref(
-    selectedStatus === "ALL" ? "ALL" : selectedStatus,
-    selectedDate,
-    dateScope,
-  );
+  const redirectPath = buildAppointmentsFilterHref(selectedStatuses, selectedDate, dateScope);
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
@@ -91,7 +96,7 @@ export default async function AppointmentsPage({
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            href={buildAppointmentsFilterHref(selectedStatus, today, "day")}
+            href={buildAppointmentsFilterHref(selectedStatuses, today, "day")}
             className={buttonStyles({
               variant: dateScope === "day" && selectedDate === today ? "primary" : "secondary",
               size: "sm",
@@ -100,7 +105,7 @@ export default async function AppointmentsPage({
             Hoy
           </Link>
           <Link
-            href={buildAppointmentsFilterHref(selectedStatus, selectedDate, "all")}
+            href={buildAppointmentsFilterHref(selectedStatuses, selectedDate, "all")}
             className={buttonStyles({
               variant: dateScope === "all" ? "primary" : "secondary",
               size: "sm",
@@ -110,37 +115,62 @@ export default async function AppointmentsPage({
           </Link>
         </div>
 
-        <form className="mt-6 grid gap-3 md:grid-cols-[220px_auto]">
-          <Field label="Fecha">
-            <input className={inputClassName} type="date" name="date" defaultValue={selectedDate} />
-          </Field>
-          <div className="self-end">
-            <button type="submit" className={buttonStyles({ variant: "secondary" })}>
-              Aplicar fecha
-            </button>
+        <form className="mt-6 space-y-4">
+          <div className="grid gap-3 md:grid-cols-[220px_auto]">
+            <Field label="Fecha">
+              <input className={inputClassName} type="date" name="date" defaultValue={selectedDate} />
+            </Field>
+            <div className="self-end">
+              <button type="submit" className={buttonStyles({ variant: "secondary" })}>
+                Aplicar filtros
+              </button>
+            </div>
           </div>
-          <input type="hidden" name="dateScope" value="day" />
-          {selectedStatus !== "ALL" ? <input type="hidden" name="status" value={selectedStatus} /> : null}
+          <Field
+            label="Estados"
+            hint="Puedes combinar uno o varios estados. Si no marcas ninguno, se mostraran Agendada y Reprogramada."
+          >
+            <div className="flex flex-wrap gap-3">
+              {statusFilters.map((status) => (
+                <label
+                  key={status}
+                  className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-sm text-foreground"
+                >
+                  <input
+                    type="checkbox"
+                    name="status"
+                    value={status}
+                    defaultChecked={selectedStatuses.includes(status)}
+                  />
+                  <span>{appointmentStatusLabel(status)}</span>
+                </label>
+              ))}
+            </div>
+          </Field>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={buildAppointmentsFilterHref(statusFilters, selectedDate, dateScope)}
+              className={buttonStyles({ variant: "secondary", size: "sm" })}
+            >
+              Todos los estados
+            </Link>
+            <Link
+              href={buildAppointmentsFilterHref(defaultStatusFilters, selectedDate, dateScope)}
+              className={buttonStyles({ variant: "secondary", size: "sm" })}
+            >
+              Restablecer por defecto
+            </Link>
+          </div>
+          <input type="hidden" name="dateScope" value={dateScope} />
         </form>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          {statusFilters.map((status) => {
-            const href = buildAppointmentsFilterHref(status, selectedDate, dateScope);
-            const active = selectedStatus === status;
-
-            return (
-              <Link
-                key={status}
-                href={href}
-                className={buttonStyles({
-                  variant: active ? "primary" : "secondary",
-                  size: "sm",
-                })}
-              >
-                {status === "ALL" ? "Todas" : appointmentStatusLabel(status)}
-              </Link>
-            );
-          })}
+        <div className="mt-4 flex flex-wrap gap-2 text-sm text-muted">
+          <span>Activos:</span>
+          {selectedStatuses.map((status) => (
+            <Badge key={status} tone={appointmentStatusTone(status)}>
+              {appointmentStatusLabel(status)}
+            </Badge>
+          ))}
         </div>
       </Card>
 
@@ -180,6 +210,12 @@ export default async function AppointmentsPage({
                     </div>
 
                     <div className="flex flex-wrap gap-3">
+                      <Link
+                        href={`/appointments/${appointment.id}/edit?redirectPath=${encodeURIComponent(redirectPath)}`}
+                        className={buttonStyles({ variant: "secondary", size: "sm" })}
+                      >
+                        Editar cita
+                      </Link>
                       <Link
                         href={`/patients/${appointment.patient.id}`}
                         className={buttonStyles({ variant: "secondary", size: "sm" })}
@@ -222,7 +258,7 @@ export default async function AppointmentsPage({
           ) : (
             <EmptyState
               title="Sin citas para este filtro"
-              description="No existen citas que coincidan con el estado seleccionado."
+              description="No existen citas que coincidan con los estados y fecha seleccionados."
               action={
                 <Link href="/appointments/new" className={buttonStyles({})}>
                   Crear cita

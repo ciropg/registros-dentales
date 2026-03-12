@@ -23,6 +23,11 @@ export const appointmentCreateSchema = z.object({
   notes: optionalTrimmedString(z.string().max(1000, "Notas demasiado largas.")),
 });
 
+export const appointmentUpdateSchema = appointmentCreateSchema.extend({
+  appointmentId: z.string().min(1, "No se pudo identificar la cita."),
+  redirectPath: z.string().min(1),
+});
+
 export const appointmentStatusUpdateSchema = z.object({
   appointmentId: z.string().min(1),
   status: z.nativeEnum(AppointmentStatus),

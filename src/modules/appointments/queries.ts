@@ -45,13 +45,11 @@ function compareAppointmentsByProximity(
 
 export async function listAppointments(
   isDemo: boolean,
-  status?: string,
+  statuses?: AppointmentStatus[],
   date?: string,
   sortByProximity = false,
 ) {
-  const normalizedStatus = Object.values(AppointmentStatus).includes(status as AppointmentStatus)
-    ? (status as AppointmentStatus)
-    : undefined;
+  const normalizedStatuses = (statuses ?? []).filter((status) => Object.values(AppointmentStatus).includes(status));
   const scheduledAt = getDateRange(date);
 
   const appointments = await prisma.appointment.findMany({
@@ -62,9 +60,11 @@ export async function listAppointments(
             scheduledAt,
           }
         : {}),
-      ...(normalizedStatus
+      ...(normalizedStatuses.length
         ? {
-            status: normalizedStatus,
+            status: {
+              in: normalizedStatuses,
+            },
           }
         : {}),
     },
@@ -134,4 +134,21 @@ export async function getAppointmentFormOptions(isDemo: boolean) {
     patients,
     treatments,
   };
+}
+
+export async function getAppointmentFormDetail(appointmentId: string, isDemo: boolean) {
+  return prisma.appointment.findFirst({
+    where: {
+      id: appointmentId,
+      isDemo,
+    },
+    select: {
+      id: true,
+      patientId: true,
+      treatmentId: true,
+      scheduledAt: true,
+      reason: true,
+      notes: true,
+    },
+  });
 }

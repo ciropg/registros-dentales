@@ -1,4 +1,4 @@
-import { NewAppointmentForm } from "@/components/appointments/new-appointment-form";
+import { AppointmentForm } from "@/components/appointments/new-appointment-form";
 import { Topbar } from "@/components/layout/topbar";
 import { Alert } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
@@ -30,12 +30,15 @@ export default async function NewAppointmentPage({
       <Card>
         <>
           {error ? <Alert message={error} tone="danger" /> : null}
-          <NewAppointmentForm
+          <AppointmentForm
             patients={options.patients}
             treatments={options.treatments}
-            defaultPatientId={derivedPatientId}
-            defaultTreatmentId={treatmentId ?? ""}
+            defaults={{
+              patientId: derivedPatientId,
+              treatmentId: treatmentId ?? "",
+            }}
             action={createAppointmentAction}
+            submitLabel="Guardar cita"
           />
         </>
       </Card>

@@ -260,9 +260,17 @@ export default async function PatientDetailPage({
                     <p className="font-semibold text-foreground">{appointment.reason || "Sin motivo registrado."}</p>
                     <p className="mt-1 text-sm text-muted">{formatDateTime(appointment.scheduledAt)}</p>
                   </div>
-                  <Badge tone={appointmentStatusTone(appointment.status)}>
-                    {appointmentStatusLabel(appointment.status)}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={appointmentStatusTone(appointment.status)}>
+                      {appointmentStatusLabel(appointment.status)}
+                    </Badge>
+                    <Link
+                      href={`/appointments/${appointment.id}/edit?redirectPath=${encodeURIComponent(`/patients/${patient.id}`)}`}
+                      className={buttonStyles({ variant: "secondary", size: "sm" })}
+                    >
+                      Editar cita
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))

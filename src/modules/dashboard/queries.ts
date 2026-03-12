@@ -22,7 +22,7 @@ export async function getDashboardData(isDemo: boolean) {
     },
   };
 
-  const [activeTreatmentsCount, activeTreatments, appointmentCounts, todayAppointments, upcomingTreatments] =
+  const [activeTreatmentsCount, activeTreatments, todayAppointments, upcomingTreatments] =
     await Promise.all([
       prisma.treatment.count({
         where: activeTreatmentsWhere,
@@ -43,15 +43,6 @@ export async function getDashboardData(isDemo: boolean) {
           estimatedEndDate: "asc",
         },
         take: 6,
-      }),
-      prisma.appointment.groupBy({
-        where: {
-          isDemo,
-        },
-        by: ["status"],
-        _count: {
-          _all: true,
-        },
       }),
       prisma.appointment.findMany({
         where: {
@@ -100,16 +91,20 @@ export async function getDashboardData(isDemo: boolean) {
       }),
     ]);
 
-  const appointmentMap = new Map(appointmentCounts.map((item) => [item.status, item._count._all]));
+  const todayAppointmentMap = new Map<AppointmentStatus, number>();
+
+  for (const appointment of todayAppointments) {
+    todayAppointmentMap.set(appointment.status, (todayAppointmentMap.get(appointment.status) ?? 0) + 1);
+  }
 
   return {
     stats: {
       activeTreatments: activeTreatmentsCount,
       todayAppointments: todayAppointments.length,
-      attendedAppointments: appointmentMap.get(AppointmentStatus.ATTENDED) ?? 0,
-      noShowAppointments: appointmentMap.get(AppointmentStatus.NO_SHOW) ?? 0,
-      rescheduledAppointments: appointmentMap.get(AppointmentStatus.RESCHEDULED) ?? 0,
-      canceledAppointments: appointmentMap.get(AppointmentStatus.CANCELED) ?? 0,
+      attendedAppointments: todayAppointmentMap.get(AppointmentStatus.ATTENDED) ?? 0,
+      noShowAppointments: todayAppointmentMap.get(AppointmentStatus.NO_SHOW) ?? 0,
+      rescheduledAppointments: todayAppointmentMap.get(AppointmentStatus.RESCHEDULED) ?? 0,
+      canceledAppointments: todayAppointmentMap.get(AppointmentStatus.CANCELED) ?? 0,
     },
     activeTreatments: activeTreatments.map((treatment) => {
       const metrics = calculateTreatmentMetrics(treatment);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { buttonStyles } from "@/components/ui/button";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 
@@ -20,26 +21,38 @@ type AppointmentTreatmentOption = {
   };
 };
 
-type NewAppointmentFormProps = {
+type AppointmentFormDefaults = {
+  appointmentId?: string;
+  patientId?: string;
+  treatmentId?: string | null;
+  scheduledAt?: Date | null;
+  reason?: string | null;
+  notes?: string | null;
+  redirectPath?: string;
+};
+
+type AppointmentFormProps = {
   patients: AppointmentPatientOption[];
   treatments: AppointmentTreatmentOption[];
-  defaultPatientId: string;
-  defaultTreatmentId: string;
+  defaults?: AppointmentFormDefaults;
   action: (formData: FormData) => void | Promise<void>;
+  submitLabel: string;
 };
 
 function getPatientLabel(patient: AppointmentPatientOption) {
   return `${patient.firstName} ${patient.lastName}`;
 }
 
-export function NewAppointmentForm({
+export function AppointmentForm({
   patients,
   treatments,
-  defaultPatientId,
-  defaultTreatmentId,
+  defaults,
   action,
-}: NewAppointmentFormProps) {
+  submitLabel,
+}: AppointmentFormProps) {
   const patientListId = useId();
+  const defaultPatientId = defaults?.patientId ?? "";
+  const defaultTreatmentId = defaults?.treatmentId ?? "";
   const initialPatient = patients.find((patient) => patient.id === defaultPatientId);
   const [patientSearch, setPatientSearch] = useState(initialPatient ? getPatientLabel(initialPatient) : "");
   const [selectedPatientId, setSelectedPatientId] = useState(defaultPatientId);
@@ -72,6 +85,9 @@ export function NewAppointmentForm({
 
   return (
     <form action={action} className="space-y-5">
+      {defaults?.appointmentId ? <input type="hidden" name="appointmentId" value={defaults.appointmentId} /> : null}
+      {defaults?.redirectPath ? <input type="hidden" name="redirectPath" value={defaults.redirectPath} /> : null}
+
       <div className="grid gap-5 md:grid-cols-2">
         <Field label="Paciente" hint="Escribe el nombre y elige una sugerencia.">
           <>
@@ -109,24 +125,36 @@ export function NewAppointmentForm({
         </Field>
 
         <Field label="Fecha y hora">
-          <input className={inputClassName} type="datetime-local" name="scheduledAt" required />
+          <input
+            className={inputClassName}
+            type="datetime-local"
+            name="scheduledAt"
+            defaultValue={defaults?.scheduledAt ? format(defaults.scheduledAt, "yyyy-MM-dd'T'HH:mm") : ""}
+            required
+          />
         </Field>
 
         <Field label="Motivo" hint="Opcional.">
           <input
             className={inputClassName}
             name="reason"
+            defaultValue={defaults?.reason ?? ""}
             placeholder="Control mensual, ajuste, limpieza..."
           />
         </Field>
       </div>
 
       <Field label="Notas" hint="Opcional.">
-        <textarea className={textareaClassName} name="notes" placeholder="Observaciones operativas o clinicas" />
+        <textarea
+          className={textareaClassName}
+          name="notes"
+          defaultValue={defaults?.notes ?? ""}
+          placeholder="Observaciones operativas o clinicas"
+        />
       </Field>
 
       <button type="submit" className={buttonStyles({})}>
-        Guardar cita
+        {submitLabel}
       </button>
     </form>
   );

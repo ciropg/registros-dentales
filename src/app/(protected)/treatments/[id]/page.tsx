@@ -226,9 +226,17 @@ export default async function TreatmentDetailPage({
                       <p className="mt-1 text-sm text-muted">{formatDateTime(appointment.scheduledAt)}</p>
                       <p className="mt-1 text-sm text-muted">{appointment.notes ?? "Sin notas."}</p>
                     </div>
-                    <Badge tone={appointmentStatusTone(appointment.status)}>
-                      {appointmentStatusLabel(appointment.status)}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={appointmentStatusTone(appointment.status)}>
+                        {appointmentStatusLabel(appointment.status)}
+                      </Badge>
+                      <Link
+                        href={`/appointments/${appointment.id}/edit?redirectPath=${encodeURIComponent(`/treatments/${treatment.id}`)}`}
+                        className={buttonStyles({ variant: "secondary", size: "sm" })}
+                      >
+                        Editar cita
+                      </Link>
+                    </div>
                   </div>
 
                   <form

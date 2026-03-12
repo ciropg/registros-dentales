@@ -43,17 +43,17 @@ export default async function DashboardPage() {
         <MetricCard
           label="Citas de hoy"
           value={data.stats.todayAppointments}
-          helper="Atencion del dia en el panel principal."
+          helper="Total de citas programadas para hoy en tu entorno."
         />
         <MetricCard
-          label="No asistencias"
+          label="No asistencias de hoy"
           value={data.stats.noShowAppointments}
-          helper="Pacientes que no acudieron y requieren seguimiento."
+          helper="Citas de hoy marcadas como no asistio y requieren seguimiento."
         />
         <MetricCard
-          label="Reprogramadas"
+          label="Reprogramadas hoy"
           value={data.stats.rescheduledAppointments}
-          helper="Citas movidas que impactan la continuidad del tratamiento."
+          helper="Citas de hoy movidas a otra fecha dentro de la operacion diaria."
         />
       </section>
 
