@@ -44,24 +44,15 @@ export default async function LoginPage({
         <p className="text-xs uppercase tracking-[0.35em] text-muted">Acceso interno</p>
         <h2 className="mt-3 text-4xl text-foreground">Iniciar sesion</h2>
         <p className="mt-3 text-sm leading-6 text-muted">
-          Usa las credenciales sembradas para entrar al panel y revisar el flujo completo.
+          Usa las credenciales demo para entrar al panel y revisar el flujo completo.
         </p>
 
-        <div className="mt-6 grid gap-4 rounded-3xl border border-brand/15 bg-brand/5 p-4 text-sm text-foreground md:grid-cols-2">
-          <div>
-            <p className="font-semibold">Entorno real</p>
-            <p className="mt-2">admin@clinic.local / Admin123!</p>
-            <p className="mt-1">dentista@clinic.local / Dentista123!</p>
-            <p className="mt-1">asistente@clinic.local / Asistente123!</p>
-            <p className="mt-1">recepcion@clinic.local / Recepcion123!</p>
-          </div>
-          <div>
-            <p className="font-semibold">Entorno demo</p>
-            <p className="mt-2">demo.admin@clinic.local / DemoAdmin123!</p>
-            <p className="mt-1">demo.dentista@clinic.local / DemoDentista123!</p>
-            <p className="mt-1">demo.asistente@clinic.local / DemoAsistente123!</p>
-            <p className="mt-1">demo.recepcion@clinic.local / DemoRecepcion123!</p>
-          </div>
+        <div className="mt-6 rounded-3xl border border-brand/15 bg-brand/5 p-4 text-sm text-foreground">
+          <p className="font-semibold">Credenciales demo</p>
+          <p className="mt-2">demo.admin@clinic.local / DemoAdmin123!</p>
+          <p className="mt-1">demo.dentista@clinic.local / DemoDentista123!</p>
+          <p className="mt-1">demo.asistente@clinic.local / DemoAsistente123!</p>
+          <p className="mt-1">demo.recepcion@clinic.local / DemoRecepcion123!</p>
         </div>
 
         <form action={loginAction} className="mt-8 space-y-5">
@@ -72,8 +63,8 @@ export default async function LoginPage({
               className={inputClassName}
               type="email"
               name="email"
-              defaultValue="admin@clinic.local"
-              placeholder="admin@clinic.local"
+              defaultValue="demo.admin@clinic.local"
+              placeholder="demo.admin@clinic.local"
               required
             />
           </Field>
@@ -83,7 +74,7 @@ export default async function LoginPage({
               className={inputClassName}
               type="password"
               name="password"
-              defaultValue="Admin123!"
+              defaultValue="DemoAdmin123!"
               required
             />
           </Field>

@@ -53,9 +53,12 @@ npm run dev
 
 ## Credenciales demo
 
-- `admin@clinic.local / Admin123!`
-- `dentista@clinic.local / Dentista123!`
-- `asistente@clinic.local / Asistente123!`
+- `demo.admin@clinic.local / DemoAdmin123!`
+- `demo.dentista@clinic.local / DemoDentista123!`
+- `demo.asistente@clinic.local / DemoAsistente123!`
+- `demo.recepcion@clinic.local / DemoRecepcion123!`
+
+Los usuarios reales existen para operacion interna, pero sus credenciales no se publican en este repositorio.
 
 ## Modelo principal
 
