@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Topbar } from "@/components/layout/topbar";
 import { Alert } from "@/components/ui/alert";
 import { buttonStyles } from "@/components/ui/button";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { Card } from "@/components/ui/card";
 import { Field, inputClassName, selectClassName } from "@/components/ui/field";
 import { requireBaseRole } from "@/lib/auth";
@@ -46,10 +47,17 @@ export default async function EditUserPage({
       />
 
       <Card>
-        <form action={updateUserAction} className="space-y-5">
+        <ConfirmActionForm
+          action={updateUserAction}
+          className="space-y-5"
+          hiddenFields={[{ name: "userId", value: user.id }]}
+          submitLabel="Guardar cambios"
+          pendingLabel="Guardando..."
+          confirmTitle="Confirmar actualizacion del usuario"
+          confirmDescription={`Se actualizaran los datos de acceso y perfil de ${user.name}.`}
+          confirmButtonLabel="Si, actualizar"
+        >
           {error ? <Alert message={error} tone="danger" /> : null}
-
-          <input type="hidden" name="userId" value={user.id} />
 
           <div className="grid gap-5 md:grid-cols-2">
             <Field label="Nombre completo">
@@ -74,11 +82,7 @@ export default async function EditUserPage({
               <input className={inputClassName} type="password" name="password" />
             </Field>
           </div>
-
-          <button type="submit" className={buttonStyles({})}>
-            Guardar cambios
-          </button>
-        </form>
+        </ConfirmActionForm>
       </Card>
     </main>
   );

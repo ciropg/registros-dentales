@@ -1,8 +1,10 @@
 "use server";
 
+import { Prisma, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +16,7 @@ import {
 } from "@/modules/users/schemas";
 import {
   canActorAssignRole,
+  getManagedRoleScopeWhere,
   getManagedUserScopeWhere,
   getUserEnvironmentFromRole,
 } from "@/modules/users/scope";
@@ -27,6 +30,10 @@ function revalidateUserPaths(userId?: string) {
     revalidatePath(`/users/${userId}`);
     revalidatePath(`/users/${userId}/edit`);
   }
+}
+
+function isDuplicateEmailError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
 async function getManagedUserOrRedirect(userId: string, actorIsDemo: boolean, redirectPath: string) {
@@ -50,6 +57,25 @@ async function getManagedUserOrRedirect(userId: string, actorIsDemo: boolean, re
   return user;
 }
 
+async function getManagedRoleOrRedirect(role: UserRole, actorIsDemo: boolean, redirectPath: string) {
+  const roleRecord = await prisma.role.findFirst({
+    where: {
+      code: role,
+      ...getManagedRoleScopeWhere(actorIsDemo),
+    },
+    select: {
+      id: true,
+      code: true,
+    },
+  });
+
+  if (!roleRecord) {
+    redirect(`${redirectPath}${buildErrorSearch("El rol seleccionado ya no existe o no pertenece a tu entorno.")}`);
+  }
+
+  return roleRecord;
+}
+
 export async function createUserAction(formData: FormData) {
   const actor = await requireBaseRole(["ADMIN"]);
 
@@ -69,12 +95,14 @@ export async function createUserAction(formData: FormData) {
   }
 
   const targetIsDemo = getUserEnvironmentFromRole(parsed.data.role);
+  const roleRecord = await getManagedRoleOrRedirect(parsed.data.role, actor.isDemo, "/users/new");
 
   try {
     const user = await prisma.user.create({
       data: {
         name: parsed.data.name,
         email: parsed.data.email,
+        roleId: roleRecord.id,
         role: parsed.data.role,
         isDemo: targetIsDemo,
         passwordHash: await bcrypt.hash(parsed.data.password, 10),
@@ -91,16 +119,26 @@ export async function createUserAction(formData: FormData) {
 
     revalidateUserPaths(user.id);
     redirect(`/users/${user.id}${buildSuccessSearch("Usuario creado correctamente.")}`);
-  } catch {
-    redirect(`/users/new${buildErrorSearch("No se pudo guardar el usuario. Verifica que el email no este duplicado.")}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    if (isDuplicateEmailError(error)) {
+      redirect(`/users/new${buildErrorSearch("No se pudo guardar el usuario. Verifica que el email no este duplicado.")}`);
+    }
+
+    console.error("User create failed", error);
+    redirect(`/users/new${buildErrorSearch("No se pudo crear el usuario.")}`);
   }
 }
 
 export async function updateUserAction(formData: FormData) {
   const actor = await requireBaseRole(["ADMIN"]);
+  const userId = String(formData.get("userId") ?? "");
 
   const parsed = userUpdateSchema.safeParse({
-    userId: formData.get("userId"),
+    userId: userId,
     name: formData.get("name"),
     email: formData.get("email"),
     role: formData.get("role"),
@@ -108,7 +146,8 @@ export async function updateUserAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`/users${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo actualizar el usuario.")}`);
+    const redirectPath = userId ? `/users/${userId}/edit` : "/users";
+    redirect(`${redirectPath}${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo actualizar el usuario.")}`);
   }
 
   if (!canActorAssignRole(actor.isDemo, parsed.data.role)) {
@@ -118,6 +157,7 @@ export async function updateUserAction(formData: FormData) {
   const managedUser = await getManagedUserOrRedirect(parsed.data.userId, actor.isDemo, "/users");
 
   const targetIsDemo = getUserEnvironmentFromRole(parsed.data.role);
+  const roleRecord = await getManagedRoleOrRedirect(parsed.data.role, actor.isDemo, `/users/${parsed.data.userId}/edit`);
 
   if (managedUser.isDemo !== targetIsDemo) {
     redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch("No se puede cambiar el entorno de un usuario existente.")}`);
@@ -129,6 +169,7 @@ export async function updateUserAction(formData: FormData) {
       data: {
         name: parsed.data.name,
         email: parsed.data.email,
+        roleId: roleRecord.id,
         role: parsed.data.role,
         isDemo: targetIsDemo,
         ...(parsed.data.password
@@ -149,10 +190,19 @@ export async function updateUserAction(formData: FormData) {
 
     revalidateUserPaths(user.id);
     redirect(`/users/${user.id}${buildSuccessSearch("Usuario actualizado correctamente.")}`);
-  } catch {
-    redirect(
-      `/users/${parsed.data.userId}/edit${buildErrorSearch("No se pudo guardar el usuario. Verifica que el email no este duplicado.")}`,
-    );
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    if (isDuplicateEmailError(error)) {
+      redirect(
+        `/users/${parsed.data.userId}/edit${buildErrorSearch("No se pudo guardar el usuario. Verifica que el email no este duplicado.")}`,
+      );
+    }
+
+    console.error("User update failed", error);
+    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch("No se pudo actualizar el usuario.")}`);
   }
 }
 

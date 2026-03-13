@@ -39,6 +39,12 @@ export default async function NewAppointmentPage({
             }}
             action={createAppointmentAction}
             submitLabel="Guardar cita"
+            pendingLabel="Guardando..."
+            confirmation={{
+              title: "Confirmar registro de cita",
+              description: "Se registrara la cita con los datos ingresados y quedara disponible en la agenda.",
+              confirmButtonLabel: "Si, registrar",
+            }}
           />
         </>
       </Card>

@@ -1,13 +1,16 @@
 import Link from "next/link";
-import { AppointmentStatus, PhaseStatus } from "@prisma/client";
+import { PhaseStatus } from "@prisma/client";
 import { notFound } from "next/navigation";
+import { AppointmentStatusForm } from "@/components/appointments/appointment-status-form";
 import { Topbar } from "@/components/layout/topbar";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { Field, selectClassName } from "@/components/ui/field";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { SearchParamFeedbackModal } from "@/components/ui/search-param-feedback-modal";
 import { requireUser } from "@/lib/auth";
 import { canCreateTreatments, canUpdateTreatmentPhases } from "@/lib/roles";
 import {
@@ -25,7 +28,6 @@ import { updatePhaseStatusAction } from "@/modules/treatments/actions";
 import { getTreatmentDetail } from "@/modules/treatments/queries";
 
 const phaseOptions = Object.values(PhaseStatus);
-const appointmentOptions = Object.values(AppointmentStatus);
 
 export default async function TreatmentDetailPage({
   params,
@@ -46,6 +48,8 @@ export default async function TreatmentDetailPage({
 
   const success = toSearchParam(query.success);
   const error = toSearchParam(query.error);
+  const appointmentUpdatedMessage = success === "Cita actualizada correctamente." ? success : undefined;
+  const successAlertMessage = success && success !== appointmentUpdatedMessage ? success : undefined;
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
@@ -78,7 +82,13 @@ export default async function TreatmentDetailPage({
         }
       />
 
-      {success ? <Alert message={success} tone="success" /> : null}
+      <SearchParamFeedbackModal
+        message={appointmentUpdatedMessage}
+        queryKey="success"
+        title={appointmentUpdatedMessage ?? "Operacion completada"}
+        description="La cita vinculada al tratamiento fue actualizada correctamente."
+      />
+      {successAlertMessage ? <Alert message={successAlertMessage} tone="success" /> : null}
       {error ? <Alert message={error} tone="danger" /> : null}
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -204,9 +214,20 @@ export default async function TreatmentDetailPage({
                 </div>
 
                 {canEditPhases ? (
-                  <form action={updatePhaseStatusAction} className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
-                    <input type="hidden" name="treatmentId" value={treatment.id} />
-                    <input type="hidden" name="phaseId" value={phase.id} />
+                  <ConfirmActionForm
+                    action={updatePhaseStatusAction}
+                    className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]"
+                    hiddenFields={[
+                      { name: "treatmentId", value: treatment.id },
+                      { name: "phaseId", value: phase.id },
+                    ]}
+                    submitLabel="Actualizar fase"
+                    pendingLabel="Actualizando..."
+                    submitClassName="self-end"
+                    confirmTitle="Confirmar actualizacion de fase"
+                    confirmDescription={`Se actualizara la fase ${phase.phaseOrder}. ${phase.name} al estado seleccionado.`}
+                    confirmButtonLabel="Si, actualizar"
+                  >
                     <Field label="Nuevo estado">
                       <select className={selectClassName} name="status" defaultValue={phase.status}>
                         {phaseOptions.map((status) => (
@@ -216,10 +237,7 @@ export default async function TreatmentDetailPage({
                         ))}
                       </select>
                     </Field>
-                    <button type="submit" className={buttonStyles({ className: "self-end" })}>
-                      Actualizar fase
-                    </button>
-                  </form>
+                  </ConfirmActionForm>
                 ) : null}
               </div>
             ))}
@@ -256,25 +274,19 @@ export default async function TreatmentDetailPage({
                     </div>
                   </div>
 
-                  <form
+                  <AppointmentStatusForm
                     action={updateAppointmentStatusAction}
+                    appointmentId={appointment.id}
+                    redirectPath={`/treatments/${treatment.id}`}
+                    patientName={`${treatment.patient.firstName} ${treatment.patient.lastName}`}
+                    currentStatus={appointment.status}
+                    scheduledAt={appointment.scheduledAt}
+                    submitLabel="Guardar estado"
+                    pendingLabel="Guardando..."
                     className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]"
-                  >
-                    <input type="hidden" name="appointmentId" value={appointment.id} />
-                    <input type="hidden" name="redirectPath" value={`/treatments/${treatment.id}`} />
-                    <Field label="Actualizar estado">
-                      <select className={selectClassName} name="status" defaultValue={appointment.status}>
-                        {appointmentOptions.map((status) => (
-                          <option key={status} value={status}>
-                            {appointmentStatusLabel(status)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <button type="submit" className={buttonStyles({ className: "self-end" })}>
-                      Guardar estado
-                    </button>
-                  </form>
+                    submitClassName="self-end"
+                    fieldLabel="Actualizar estado"
+                  />
                 </div>
               ))
             ) : (

@@ -50,6 +50,12 @@ export default async function EditAppointmentPage({
             }}
             action={updateAppointmentAction}
             submitLabel="Guardar cambios"
+            pendingLabel="Guardando..."
+            confirmation={{
+              title: "Confirmar actualizacion de cita",
+              description: "Se actualizaran los datos de la cita con la informacion ingresada.",
+              confirmButtonLabel: "Si, actualizar",
+            }}
           />
         </>
       </Card>

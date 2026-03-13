@@ -1,7 +1,7 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
-import { buttonStyles } from "@/components/ui/button";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
+import { type ButtonVariant } from "@/components/ui/button";
 
 type BulkStatusWarningFormProps = {
   date: string;
@@ -9,27 +9,9 @@ type BulkStatusWarningFormProps = {
   buttonLabel: string;
   pendingLabel: string;
   confirmMessage: string;
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "warning";
+  variant?: ButtonVariant;
   action: (formData: FormData) => void | Promise<void>;
 };
-
-function SubmitButton({
-  buttonLabel,
-  pendingLabel,
-  variant,
-}: {
-  buttonLabel: string;
-  pendingLabel: string;
-  variant: BulkStatusWarningFormProps["variant"];
-}) {
-  const { pending } = useFormStatus();
-
-  return (
-    <button type="submit" className={buttonStyles({ size: "sm", variant })} disabled={pending}>
-      {pending ? pendingLabel : buttonLabel}
-    </button>
-  );
-}
 
 export function BulkStatusWarningForm({
   date,
@@ -40,17 +22,22 @@ export function BulkStatusWarningForm({
   variant = "warning",
   action,
 }: BulkStatusWarningFormProps) {
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    if (!window.confirm(confirmMessage)) {
-      event.preventDefault();
-    }
-  }
-
   return (
-    <form action={action} onSubmit={handleSubmit}>
-      <input type="hidden" name="date" value={date} />
-      <input type="hidden" name="redirectPath" value={redirectPath} />
-      <SubmitButton buttonLabel={buttonLabel} pendingLabel={pendingLabel} variant={variant} />
-    </form>
+    <ConfirmActionForm
+      action={action}
+      hiddenFields={[
+        { name: "date", value: date },
+        { name: "redirectPath", value: redirectPath },
+      ]}
+      submitLabel={buttonLabel}
+      pendingLabel={pendingLabel}
+      submitVariant={variant}
+      submitSize="sm"
+      confirmTitle={buttonLabel}
+      confirmDescription={confirmMessage}
+      confirmButtonLabel="Si, continuar"
+      confirmButtonVariant={variant}
+      confirmTone={variant === "warning" ? "warning" : "neutral"}
+    />
   );
 }

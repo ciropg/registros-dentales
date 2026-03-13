@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppointmentStatus } from "@prisma/client";
 import { format } from "date-fns";
+import { AppointmentStatusForm } from "@/components/appointments/appointment-status-form";
 import { BulkStatusWarningForm } from "@/components/appointments/bulk-status-warning-form";
 import { Topbar } from "@/components/layout/topbar";
 import { Alert } from "@/components/ui/alert";
@@ -8,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, inputClassName, selectClassName } from "@/components/ui/field";
+import { Field, inputClassName } from "@/components/ui/field";
 import { Pagination } from "@/components/ui/pagination";
+import { SearchParamFeedbackModal } from "@/components/ui/search-param-feedback-modal";
 import { requireUser } from "@/lib/auth";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDateTime } from "@/lib/date";
@@ -76,6 +78,8 @@ export default async function AppointmentsPage({
   const requestedPage = toPositiveIntSearchParam(params.page);
   const success = toSearchParam(params.success);
   const error = toSearchParam(params.error);
+  const appointmentUpdatedMessage = success === "Cita actualizada correctamente." ? success : undefined;
+  const successAlertMessage = success && success !== appointmentUpdatedMessage ? success : undefined;
   const appointments = await listAppointments(
     user.isDemo,
     selectedStatuses,
@@ -99,7 +103,13 @@ export default async function AppointmentsPage({
         }
       />
 
-      {success ? <Alert message={success} tone="success" /> : null}
+      <SearchParamFeedbackModal
+        message={appointmentUpdatedMessage}
+        queryKey="success"
+        title={appointmentUpdatedMessage ?? "Operacion completada"}
+        description="La cita fue modificada correctamente y la agenda ya muestra la informacion actualizada."
+      />
+      {successAlertMessage ? <Alert message={successAlertMessage} tone="success" /> : null}
       {error ? <Alert message={error} tone="danger" /> : null}
 
       <Card>
@@ -269,25 +279,19 @@ export default async function AppointmentsPage({
                     </div>
                   </div>
 
-                  <form
+                  <AppointmentStatusForm
                     action={updateAppointmentStatusAction}
+                    appointmentId={appointment.id}
+                    redirectPath={redirectPath}
+                    patientName={`${appointment.patient.firstName} ${appointment.patient.lastName}`}
+                    currentStatus={appointment.status}
+                    scheduledAt={appointment.scheduledAt}
+                    submitLabel="Guardar cambio"
+                    pendingLabel="Guardando..."
                     className="grid gap-3 rounded-3xl border border-line bg-white/80 p-4 lg:min-w-[320px]"
-                  >
-                    <input type="hidden" name="appointmentId" value={appointment.id} />
-                    <input type="hidden" name="redirectPath" value={redirectPath} />
-                    <Field label="Estado">
-                      <select className={selectClassName} name="status" defaultValue={appointment.status}>
-                        {Object.values(AppointmentStatus).map((status) => (
-                          <option key={status} value={status}>
-                            {appointmentStatusLabel(status)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <button type="submit" className={buttonStyles({})}>
-                      Guardar cambio
-                    </button>
-                  </form>
+                    submitClassName="self-end"
+                    fieldLabel="Estado"
+                  />
                 </div>
               </div>
             ))

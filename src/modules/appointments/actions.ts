@@ -31,6 +31,11 @@ async function getAppointmentOrRedirect(appointmentId: string, isDemo: boolean, 
       id: true,
       patientId: true,
       treatmentId: true,
+      scheduledAt: true,
+      reason: true,
+      notes: true,
+      status: true,
+      isDemo: true,
     },
   });
 
@@ -248,6 +253,7 @@ export async function updateAppointmentStatusAction(formData: FormData) {
     appointmentId: formData.get("appointmentId"),
     status: formData.get("status"),
     redirectPath: formData.get("redirectPath"),
+    rescheduledAt: formData.get("rescheduledAt"),
   });
 
   if (!parsed.success) {
@@ -255,6 +261,53 @@ export async function updateAppointmentStatusAction(formData: FormData) {
   }
 
   const existingAppointment = await getAppointmentOrRedirect(parsed.data.appointmentId, user.isDemo, parsed.data.redirectPath);
+
+  if (parsed.data.status === AppointmentStatus.RESCHEDULED) {
+    if (existingAppointment.status !== AppointmentStatus.SCHEDULED) {
+      redirect(appendSearchMessage(parsed.data.redirectPath, "error", "Solo puedes reprogramar citas con estado Agendada."));
+    }
+
+    const newScheduledAt = new Date(parsed.data.rescheduledAt ?? "");
+
+    if (Number.isNaN(newScheduledAt.getTime())) {
+      redirect(appendSearchMessage(parsed.data.redirectPath, "error", "La nueva fecha de reprogramacion no es valida."));
+    }
+
+    if (newScheduledAt.getTime() === existingAppointment.scheduledAt.getTime()) {
+      redirect(
+        appendSearchMessage(
+          parsed.data.redirectPath,
+          "error",
+          "Selecciona una fecha distinta para registrar la reprogramacion.",
+        ),
+      );
+    }
+
+    const rescheduledAppointment = await prisma.appointment.update({
+      where: { id: existingAppointment.id },
+      data: {
+        status: AppointmentStatus.RESCHEDULED,
+        scheduledAt: newScheduledAt,
+      },
+      select: {
+        id: true,
+        patientId: true,
+        treatmentId: true,
+      },
+    });
+
+    await recordAudit({
+      actorId: user.id,
+      entityType: "appointment",
+      entityId: rescheduledAppointment.id,
+      action: "APPOINTMENT_STATUS_UPDATED",
+      description: `Cita reprogramada para ${parsed.data.rescheduledAt}.`,
+    });
+
+    revalidateAppointmentPaths(rescheduledAppointment.patientId, rescheduledAppointment.treatmentId);
+
+    redirect(appendSearchMessage(parsed.data.redirectPath, "success", "Cita reprogramada correctamente."));
+  }
 
   const appointment = await prisma.appointment.update({
     where: { id: existingAppointment.id },

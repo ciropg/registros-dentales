@@ -8,9 +8,11 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { SearchParamFeedbackModal } from "@/components/ui/search-param-feedback-modal";
 import { canCreateTreatments, canManagePatients } from "@/lib/roles";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDate, formatDateTime } from "@/lib/date";
@@ -35,6 +37,8 @@ export default async function PatientDetailPage({
 
   const success = toSearchParam(query.success);
   const error = toSearchParam(query.error);
+  const appointmentUpdatedMessage = success === "Cita actualizada correctamente." ? success : undefined;
+  const successAlertMessage = success && success !== appointmentUpdatedMessage ? success : undefined;
   const showPatientManagementActions = canManagePatients(viewer.role);
   const showTreatmentCreateActions = canCreateTreatments(viewer.role);
 
@@ -75,7 +79,13 @@ export default async function PatientDetailPage({
         }
       />
 
-      {success ? <Alert message={success} tone="success" /> : null}
+      <SearchParamFeedbackModal
+        message={appointmentUpdatedMessage}
+        queryKey="success"
+        title={appointmentUpdatedMessage ?? "Operacion completada"}
+        description="La cita del paciente fue actualizada correctamente."
+      />
+      {successAlertMessage ? <Alert message={successAlertMessage} tone="success" /> : null}
       {error ? <Alert message={error} tone="danger" /> : null}
 
       <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
@@ -231,13 +241,22 @@ export default async function PatientDetailPage({
                     >
                       Abrir original
                     </a>
-                    <form action={deletePatientPhotoAction}>
-                      <input type="hidden" name="patientId" value={patient.id} />
-                      <input type="hidden" name="photoId" value={photo.id} />
-                      <button type="submit" className={buttonStyles({ variant: "danger", size: "sm" })}>
-                        Eliminar
-                      </button>
-                    </form>
+                    <ConfirmActionForm
+                      action={deletePatientPhotoAction}
+                      hiddenFields={[
+                        { name: "patientId", value: patient.id },
+                        { name: "photoId", value: photo.id },
+                      ]}
+                      submitLabel="Eliminar"
+                      pendingLabel="Eliminando..."
+                      submitVariant="danger"
+                      submitSize="sm"
+                      confirmTitle="Eliminar foto"
+                      confirmDescription="La foto se eliminara del sistema y del almacenamiento asociado."
+                      confirmButtonLabel="Si, eliminar"
+                      confirmButtonVariant="danger"
+                      confirmTone="danger"
+                    />
                   </div>
                 </div>
               </div>

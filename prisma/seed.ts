@@ -1,4 +1,5 @@
-import { AppointmentStatus, PhaseStatus, TreatmentStatus, UserRole } from "@prisma/client";
+import { loadEnvConfig } from "@next/env";
+import { AppointmentStatus, PhaseStatus, PrismaClient, TreatmentStatus, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { addDays, subDays } from "date-fns";
 import {
@@ -7,7 +8,20 @@ import {
   getRoleLabel,
   isDemoRole,
 } from "../src/lib/roles";
-import { prisma } from "../src/lib/prisma";
+
+loadEnvConfig(process.cwd());
+
+const prisma = new PrismaClient();
+
+function readRequiredEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Falta la variable de entorno requerida: ${name}`);
+  }
+
+  return value;
+}
 
 async function main() {
   await prisma.appointment.deleteMany();
@@ -27,32 +41,40 @@ async function main() {
     })),
   });
 
+  const roles = await prisma.role.findMany({
+    select: {
+      id: true,
+      code: true,
+    },
+  });
+  const roleIdByCode = new Map(roles.map((role) => [role.code, role.id]));
+
   const userSeeds = [
     {
       name: "Administrador",
-      email: "admin@clinic.local",
-      password: "Admin123!",
+      email: readRequiredEnv("REAL_ADMIN_EMAIL"),
+      password: readRequiredEnv("REAL_ADMIN_PASSWORD"),
       role: UserRole.ADMIN,
       isDemo: false,
     },
     {
       name: "Dra. Camila Torres",
-      email: "dentista@clinic.local",
-      password: "Dentista123!",
+      email: readRequiredEnv("REAL_DENTIST_EMAIL"),
+      password: readRequiredEnv("REAL_DENTIST_PASSWORD"),
       role: UserRole.DENTIST,
       isDemo: false,
     },
     {
       name: "Lucia Ramos",
-      email: "asistente@clinic.local",
-      password: "Asistente123!",
+      email: readRequiredEnv("REAL_ASSISTANT_EMAIL"),
+      password: readRequiredEnv("REAL_ASSISTANT_PASSWORD"),
       role: UserRole.ASSISTANT,
       isDemo: false,
     },
     {
       name: "Mariela Soto",
-      email: "recepcion@clinic.local",
-      password: "Recepcion123!",
+      email: readRequiredEnv("REAL_RECEPTIONIST_EMAIL"),
+      password: readRequiredEnv("REAL_RECEPTIONIST_PASSWORD"),
       role: UserRole.RECEPTIONIST,
       isDemo: false,
     },
@@ -87,23 +109,30 @@ async function main() {
   ];
 
   const createdUsers = await Promise.all(
-    userSeeds.map(async (user) =>
-      prisma.user.create({
+    userSeeds.map(async (user) => {
+      const roleId = roleIdByCode.get(user.role);
+
+      if (!roleId) {
+        throw new Error(`No se encontro el rol ${user.role} durante el seed.`);
+      }
+
+      return prisma.user.create({
         data: {
           name: user.name,
           email: user.email,
           passwordHash: await bcrypt.hash(user.password, 10),
+          roleId,
           role: user.role,
           isDemo: user.isDemo,
         },
-      }),
-    ),
+      });
+    }),
   );
 
-  const admin = createdUsers.find((user) => user.role === UserRole.ADMIN);
-  const dentist = createdUsers.find((user) => user.role === UserRole.DENTIST);
+  const demoAdmin = createdUsers.find((user) => user.role === UserRole.DEMO_ADMIN);
+  const demoDentist = createdUsers.find((user) => user.role === UserRole.DEMO_DENTIST);
 
-  if (!admin || !dentist) {
+  if (!demoAdmin || !demoDentist) {
     throw new Error("No se pudieron crear los usuarios base para el seed.");
   }
 
@@ -116,7 +145,7 @@ async function main() {
       email: "mario.quispe@email.local",
       birthDate: new Date("1990-03-14"),
       notes: "Paciente con seguimiento ortodontico quincenal.",
-      isDemo: false,
+      isDemo: true,
     },
   });
 
@@ -129,21 +158,34 @@ async function main() {
       email: "valeria.sanchez@email.local",
       birthDate: new Date("1988-08-29"),
       notes: "Paciente en rehabilitacion y control periodontal.",
-      isDemo: false,
+      isDemo: true,
+    },
+  });
+
+  const patientThree = await prisma.patient.create({
+    data: {
+      firstName: "Camila",
+      lastName: "Herrera",
+      documentNumber: "61120557",
+      phone: "977665544",
+      email: "camila.herrera@email.local",
+      birthDate: new Date("1995-11-05"),
+      notes: "Paciente de mantenimiento preventivo con controles trimestrales.",
+      isDemo: true,
     },
   });
 
   const orthodontic = await prisma.treatment.create({
     data: {
       patientId: patientOne.id,
-      dentistId: dentist.id,
+      dentistId: demoDentist.id,
       title: "Ortodoncia integral",
       diagnosis: "Maloclusion clase II y apinamiento moderado.",
       startDate: subDays(new Date(), 42),
       estimatedEndDate: addDays(new Date(), 120),
       status: TreatmentStatus.IN_PROGRESS,
       notes: "Se esperan controles cada 15 dias.",
-      isDemo: false,
+      isDemo: true,
       phases: {
         create: [
           {
@@ -184,14 +226,14 @@ async function main() {
   const rehabilitation = await prisma.treatment.create({
     data: {
       patientId: patientTwo.id,
-      dentistId: dentist.id,
+      dentistId: demoDentist.id,
       title: "Rehabilitacion oral",
       diagnosis: "Desgaste oclusal y necesidad de coronas unitarias.",
       startDate: subDays(new Date(), 18),
       estimatedEndDate: addDays(new Date(), 45),
       status: TreatmentStatus.IN_PROGRESS,
       notes: "Priorizar citas de prueba y control oclusal.",
-      isDemo: false,
+      isDemo: true,
       phases: {
         create: [
           {
@@ -229,6 +271,53 @@ async function main() {
     },
   });
 
+  const preventiveCare = await prisma.treatment.create({
+    data: {
+      patientId: patientThree.id,
+      dentistId: demoDentist.id,
+      title: "Mantenimiento preventivo",
+      diagnosis: "Control de placa y sellantes preventivos.",
+      startDate: subDays(new Date(), 5),
+      estimatedEndDate: addDays(new Date(), 20),
+      status: TreatmentStatus.IN_PROGRESS,
+      notes: "Coordinar higiene, profilaxis y control de sensibilidad.",
+      isDemo: true,
+      phases: {
+        create: [
+          {
+            name: "Evaluacion clinica",
+            phaseOrder: 1,
+            weight: 2,
+            status: PhaseStatus.COMPLETED,
+            plannedDate: subDays(new Date(), 5),
+            completedDate: subDays(new Date(), 4),
+          },
+          {
+            name: "Profilaxis",
+            phaseOrder: 2,
+            weight: 2,
+            status: PhaseStatus.IN_PROGRESS,
+            plannedDate: subDays(new Date(), 1),
+          },
+          {
+            name: "Aplicacion de sellantes",
+            phaseOrder: 3,
+            weight: 2,
+            status: PhaseStatus.PENDING,
+            plannedDate: addDays(new Date(), 8),
+          },
+          {
+            name: "Control final",
+            phaseOrder: 4,
+            weight: 1,
+            status: PhaseStatus.PENDING,
+            plannedDate: addDays(new Date(), 18),
+          },
+        ],
+      },
+    },
+  });
+
   await prisma.appointment.createMany({
     data: [
       {
@@ -238,7 +327,7 @@ async function main() {
         status: AppointmentStatus.ATTENDED,
         reason: "Control y ajuste",
         notes: "Sin incidencias.",
-        isDemo: false,
+        isDemo: true,
       },
       {
         patientId: patientOne.id,
@@ -246,7 +335,7 @@ async function main() {
         scheduledAt: subDays(new Date(), 15),
         status: AppointmentStatus.NO_SHOW,
         reason: "Control mensual",
-        isDemo: false,
+        isDemo: true,
       },
       {
         patientId: patientOne.id,
@@ -254,7 +343,7 @@ async function main() {
         scheduledAt: addDays(new Date(), 2),
         status: AppointmentStatus.SCHEDULED,
         reason: "Control y ajuste",
-        isDemo: false,
+        isDemo: true,
       },
       {
         patientId: patientTwo.id,
@@ -262,7 +351,7 @@ async function main() {
         scheduledAt: subDays(new Date(), 7),
         status: AppointmentStatus.ATTENDED,
         reason: "Control de impresiones",
-        isDemo: false,
+        isDemo: true,
       },
       {
         patientId: patientTwo.id,
@@ -271,7 +360,7 @@ async function main() {
         status: AppointmentStatus.RESCHEDULED,
         reason: "Prueba clinica",
         notes: "Paciente solicito cambio por viaje.",
-        isDemo: false,
+        isDemo: true,
       },
       {
         patientId: patientTwo.id,
@@ -279,30 +368,52 @@ async function main() {
         scheduledAt: addDays(new Date(), 6),
         status: AppointmentStatus.SCHEDULED,
         reason: "Prueba clinica reprogramada",
-        isDemo: false,
+        isDemo: true,
+      },
+      {
+        patientId: patientThree.id,
+        treatmentId: preventiveCare.id,
+        scheduledAt: startOfTodayAtHour(11),
+        status: AppointmentStatus.SCHEDULED,
+        reason: "Control preventivo",
+        notes: "Cita visible en el dashboard demo de hoy.",
+        isDemo: true,
+      },
+      {
+        patientId: patientThree.id,
+        treatmentId: preventiveCare.id,
+        scheduledAt: addDays(new Date(), 8),
+        status: AppointmentStatus.SCHEDULED,
+        reason: "Aplicacion de sellantes",
+        isDemo: true,
       },
     ],
   });
 
   await prisma.auditLog.create({
     data: {
-      actorId: admin.id,
+      actorId: demoAdmin.id,
       entityType: "seed",
       entityId: "initial-load",
-      action: "SEED_EXECUTED",
-      description: "Carga inicial de datos de ejemplo.",
+      action: "DEMO_SEED_EXECUTED",
+      description: "Carga inicial de datos demo de ejemplo.",
     },
   });
 
   console.log("Seed completa.");
-  console.log("Admin: admin@clinic.local / Admin123!");
-  console.log("Dentista: dentista@clinic.local / Dentista123!");
-  console.log("Asistente: asistente@clinic.local / Asistente123!");
-  console.log("Recepcionista: recepcion@clinic.local / Recepcion123!");
+  console.log("Las credenciales reales se cargaron desde variables REAL_* del entorno local.");
   console.log("Demo admin: demo.admin@clinic.local / DemoAdmin123!");
   console.log("Demo dentista: demo.dentista@clinic.local / DemoDentista123!");
   console.log("Demo asistente: demo.asistente@clinic.local / DemoAsistente123!");
   console.log("Demo recepcionista: demo.recepcion@clinic.local / DemoRecepcion123!");
+}
+
+function startOfTodayAtHour(hour: number) {
+  const date = new Date();
+
+  date.setHours(hour, 0, 0, 0);
+
+  return date;
 }
 
 main()

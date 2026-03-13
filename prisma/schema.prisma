@@ -50,22 +50,26 @@ model Role {
   isDemo      Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  users       User[]
 }
 
 model User {
-  id           String      @id @default(cuid())
-  name         String
-  email        String      @unique
-  passwordHash String
-  role         UserRole
-  isDemo       Boolean     @default(false)
-  active       Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  treatments   Treatment[] @relation("DentistTreatments")
-  auditLogs    AuditLog[]
+  id             String      @id @default(cuid())
+  name           String
+  email          String      @unique
+  passwordHash   String
+  roleId         String
+  role           UserRole
+  isDemo         Boolean     @default(false)
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  roleDefinition Role        @relation(fields: [roleId], references: [id])
+  treatments     Treatment[] @relation("DentistTreatments")
+  auditLogs      AuditLog[]
 
   @@index([isDemo])
+  @@index([roleId])
 }
 
 model Patient {

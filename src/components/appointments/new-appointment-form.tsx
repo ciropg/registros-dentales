@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { format } from "date-fns";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { buttonStyles } from "@/components/ui/button";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 
@@ -37,6 +38,13 @@ type AppointmentFormProps = {
   defaults?: AppointmentFormDefaults;
   action: (formData: FormData) => void | Promise<void>;
   submitLabel: string;
+  pendingLabel?: string;
+  confirmation?: {
+    title: string;
+    description?: React.ReactNode;
+    confirmButtonLabel?: string;
+    confirmTone?: "neutral" | "warning" | "danger";
+  };
 };
 
 function getPatientLabel(patient: AppointmentPatientOption) {
@@ -49,6 +57,8 @@ export function AppointmentForm({
   defaults,
   action,
   submitLabel,
+  pendingLabel = "Guardando...",
+  confirmation,
 }: AppointmentFormProps) {
   const patientListId = useId();
   const defaultPatientId = defaults?.patientId ?? "";
@@ -83,11 +93,13 @@ export function AppointmentForm({
     setSelectedPatientId(matchedPatient?.id ?? "");
   }
 
-  return (
-    <form action={action} className="space-y-5">
-      {defaults?.appointmentId ? <input type="hidden" name="appointmentId" value={defaults.appointmentId} /> : null}
-      {defaults?.redirectPath ? <input type="hidden" name="redirectPath" value={defaults.redirectPath} /> : null}
+  const hiddenFields = [
+    ...(defaults?.appointmentId ? [{ name: "appointmentId", value: defaults.appointmentId }] : []),
+    ...(defaults?.redirectPath ? [{ name: "redirectPath", value: defaults.redirectPath }] : []),
+  ];
 
+  const formFields = (
+    <>
       <div className="grid gap-5 md:grid-cols-2">
         <Field label="Paciente" hint="Escribe el nombre y elige una sugerencia.">
           <>
@@ -152,7 +164,33 @@ export function AppointmentForm({
           placeholder="Observaciones operativas o clinicas"
         />
       </Field>
+    </>
+  );
 
+  if (confirmation) {
+    return (
+      <ConfirmActionForm
+        action={action}
+        className="space-y-5"
+        hiddenFields={hiddenFields}
+        submitLabel={submitLabel}
+        pendingLabel={pendingLabel}
+        confirmTitle={confirmation.title}
+        confirmDescription={confirmation.description}
+        confirmButtonLabel={confirmation.confirmButtonLabel}
+        confirmTone={confirmation.confirmTone}
+      >
+        {formFields}
+      </ConfirmActionForm>
+    );
+  }
+
+  return (
+    <form action={action} className="space-y-5">
+      {hiddenFields.map((field) => (
+        <input key={field.name} type="hidden" name={field.name} value={field.value} />
+      ))}
+      {formFields}
       <button type="submit" className={buttonStyles({})}>
         {submitLabel}
       </button>

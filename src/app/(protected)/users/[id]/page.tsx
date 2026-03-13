@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { SearchParamFeedbackModal } from "@/components/ui/search-param-feedback-modal";
 import { requireBaseRole } from "@/lib/auth";
 import { formatDateTime } from "@/lib/date";
 import { toSearchParam } from "@/lib/utils";
@@ -50,7 +51,12 @@ export default async function UserDetailPage({
         }
       />
 
-      {success ? <Alert message={success} tone="success" /> : null}
+      <SearchParamFeedbackModal
+        message={success}
+        queryKey="success"
+        title={success ?? "Operacion completada"}
+        description="Los cambios del usuario ya fueron guardados correctamente."
+      />
       {error ? <Alert message={error} tone="danger" /> : null}
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
