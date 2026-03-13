@@ -5,7 +5,7 @@ Sistema web para una clinica dental construido con:
 - Next.js App Router
 - TypeScript
 - Prisma ORM
-- SQLite
+- PostgreSQL
 - Tailwind CSS
 
 ## Alcance del MVP
@@ -46,10 +46,45 @@ prisma/
 
 ```bash
 npm install
-npx prisma migrate dev --name init
+npm run db:migrate
 npm run db:seed
 npm run dev
 ```
+
+## Variables de entorno
+
+Usa [.env.example](./.env.example) como base. Para desarrollo local necesitas una instancia de PostgreSQL accesible desde `DATABASE_URL`.
+
+## Despliegue en Vercel con Postgres
+
+Flujo recomendado para produccion nueva:
+
+1. Crea un proyecto en Vercel y conecta este repositorio.
+2. Agrega una base PostgreSQL desde Vercel Marketplace. La opcion recomendada para este proyecto es Prisma Postgres.
+3. Configura en Vercel las variables de entorno requeridas:
+   - `DATABASE_URL`
+   - `AUTH_SECRET`
+   - `CLOUDINARY_CLOUD_NAME`
+   - `CLOUDINARY_API_KEY`
+   - `CLOUDINARY_API_SECRET`
+   - credenciales iniciales `REAL_*` si quieres generar usuarios base con seed
+4. Ejecuta las migraciones contra la base remota con:
+
+```bash
+npm run db:deploy
+```
+
+5. Si quieres poblar roles, usuarios base y cuentas demo, ejecuta una sola vez:
+
+```bash
+npm run db:seed
+```
+
+Notas:
+
+- Este cambio deja de usar `SQLite` y no migra automaticamente el contenido previo de `prisma/dev.db`.
+- El proyecto genera Prisma Client en `postinstall`, por lo que Vercel puede compilarlo sin pasos extra de generacion.
+- Para despliegues automáticos, puedes configurar en Vercel el Build Command como `npm run db:deploy && npm run build`.
 
 ## Credenciales demo
 
