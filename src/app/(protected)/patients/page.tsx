@@ -7,14 +7,31 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { inputClassName } from "@/components/ui/field";
+import { Pagination } from "@/components/ui/pagination";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { requireUser } from "@/lib/auth";
 import { daysLabel, formatDate } from "@/lib/date";
 import { canCreateTreatments, canManagePatients } from "@/lib/roles";
 import { treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
-import { toSearchParam } from "@/lib/utils";
+import { toPositiveIntSearchParam, toSearchParam } from "@/lib/utils";
 import { deletePatientAction } from "@/modules/patients/actions";
 import { listPatients } from "@/modules/patients/queries";
+
+function buildPatientsPageHref(search: string | undefined, page: number) {
+  const params = new URLSearchParams();
+
+  if (search) {
+    params.set("q", search);
+  }
+
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+
+  const query = params.toString();
+
+  return query ? `/patients?${query}` : "/patients";
+}
 
 export default async function PatientsPage({
   searchParams,
@@ -24,9 +41,10 @@ export default async function PatientsPage({
   const params = await searchParams;
   const user = await requireUser();
   const q = toSearchParam(params.q);
+  const requestedPage = toPositiveIntSearchParam(params.page);
   const success = toSearchParam(params.success);
   const error = toSearchParam(params.error);
-  const patients = await listPatients(user.isDemo, q);
+  const patients = await listPatients(user.isDemo, q, requestedPage);
   const showPatientManagementActions = canManagePatients(user.role);
   const showTreatmentCreateActions = canCreateTreatments(user.role);
 
@@ -66,8 +84,8 @@ export default async function PatientsPage({
       </Card>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        {patients.length ? (
-          patients.map((patient) => (
+        {patients.items.length ? (
+          patients.items.map((patient) => (
             <Card key={patient.id} className="bg-white/80">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
@@ -177,6 +195,21 @@ export default async function PatientsPage({
           </div>
         )}
       </section>
+
+      {patients.totalPages > 1 ? (
+        <Pagination
+          currentPage={patients.page}
+          totalPages={patients.totalPages}
+          totalCount={patients.totalCount}
+          pageSize={patients.pageSize}
+          currentCount={patients.items.length}
+          itemLabel="pacientes"
+          prevHref={patients.page > 1 ? buildPatientsPageHref(q, patients.page - 1) : undefined}
+          nextHref={
+            patients.page < patients.totalPages ? buildPatientsPageHref(q, patients.page + 1) : undefined
+          }
+        />
+      ) : null}
     </main>
   );
 }

@@ -1,22 +1,30 @@
 import { prisma } from "@/lib/prisma";
 import { calculateTreatmentMetrics } from "@/modules/treatments/calculators";
 
-export async function listPatients(isDemo: boolean, search?: string) {
+const PATIENTS_PAGE_SIZE = 8;
+
+export async function listPatients(isDemo: boolean, search?: string, page = 1) {
   const query = search?.trim();
+  const where = {
+    isDemo,
+    ...(query
+      ? {
+          OR: [
+            { firstName: { contains: query } },
+            { lastName: { contains: query } },
+            { documentNumber: { contains: query } },
+          ],
+        }
+      : {}),
+  };
+  const totalCount = await prisma.patient.count({ where });
+  const totalPages = Math.max(1, Math.ceil(totalCount / PATIENTS_PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
 
   const patients = await prisma.patient.findMany({
-    where: {
-      isDemo,
-      ...(query
-        ? {
-            OR: [
-              { firstName: { contains: query } },
-              { lastName: { contains: query } },
-              { documentNumber: { contains: query } },
-            ],
-          }
-        : {}),
-    },
+    where,
+    skip: (currentPage - 1) * PATIENTS_PAGE_SIZE,
+    take: PATIENTS_PAGE_SIZE,
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     include: {
       treatments: {
@@ -44,7 +52,7 @@ export async function listPatients(isDemo: boolean, search?: string) {
     },
   });
 
-  return patients.map((patient) => {
+  const items = patients.map((patient) => {
     const activeTreatment = patient.treatments.find((treatment) => treatment.status !== "COMPLETED");
 
     return {
@@ -59,6 +67,14 @@ export async function listPatients(isDemo: boolean, search?: string) {
         : null,
     };
   });
+
+  return {
+    items,
+    page: currentPage,
+    pageSize: PATIENTS_PAGE_SIZE,
+    totalCount,
+    totalPages,
+  };
 }
 
 export async function getPatientDetail(patientId: string, isDemo: boolean) {

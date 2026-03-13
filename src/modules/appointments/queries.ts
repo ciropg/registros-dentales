@@ -2,6 +2,8 @@ import { AppointmentStatus, TreatmentStatus } from "@prisma/client";
 import { endOfDay, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 
+const APPOINTMENTS_PAGE_SIZE = 10;
+
 function getDateRange(date: string | undefined) {
   if (!date) {
     return undefined;
@@ -48,26 +50,65 @@ export async function listAppointments(
   statuses?: AppointmentStatus[],
   date?: string,
   sortByProximity = false,
+  page = 1,
 ) {
   const normalizedStatuses = (statuses ?? []).filter((status) => Object.values(AppointmentStatus).includes(status));
   const scheduledAt = getDateRange(date);
+  const where = {
+    isDemo,
+    ...(scheduledAt
+      ? {
+          scheduledAt,
+        }
+      : {}),
+    ...(normalizedStatuses.length
+      ? {
+          status: {
+            in: normalizedStatuses,
+          },
+        }
+      : {}),
+  };
+
+  if (!sortByProximity) {
+    const totalCount = await prisma.appointment.count({ where });
+    const totalPages = Math.max(1, Math.ceil(totalCount / APPOINTMENTS_PAGE_SIZE));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+
+    const appointments = await prisma.appointment.findMany({
+      where,
+      skip: (currentPage - 1) * APPOINTMENTS_PAGE_SIZE,
+      take: APPOINTMENTS_PAGE_SIZE,
+      orderBy: [{ scheduledAt: "asc" }, { createdAt: "desc" }],
+      include: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        treatment: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    return {
+      items: appointments,
+      page: currentPage,
+      pageSize: APPOINTMENTS_PAGE_SIZE,
+      totalCount,
+      totalPages,
+    };
+  }
 
   const appointments = await prisma.appointment.findMany({
-    where: {
-      isDemo,
-      ...(scheduledAt
-        ? {
-            scheduledAt,
-          }
-        : {}),
-      ...(normalizedStatuses.length
-        ? {
-            status: {
-              in: normalizedStatuses,
-            },
-          }
-        : {}),
-    },
+    where,
     orderBy: [{ scheduledAt: "asc" }, { createdAt: "desc" }],
     include: {
       patient: {
@@ -86,14 +127,25 @@ export async function listAppointments(
       },
     },
   });
-
-  if (!sortByProximity) {
-    return appointments;
-  }
-
   const referenceTime = Date.now();
+  const sortedAppointments = [...appointments].sort((left, right) =>
+    compareAppointmentsByProximity(left, right, referenceTime),
+  );
+  const totalCount = sortedAppointments.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / APPOINTMENTS_PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const paginatedAppointments = sortedAppointments.slice(
+    (currentPage - 1) * APPOINTMENTS_PAGE_SIZE,
+    currentPage * APPOINTMENTS_PAGE_SIZE,
+  );
 
-  return [...appointments].sort((left, right) => compareAppointmentsByProximity(left, right, referenceTime));
+  return {
+    items: paginatedAppointments,
+    page: currentPage,
+    pageSize: APPOINTMENTS_PAGE_SIZE,
+    totalCount,
+    totalPages,
+  };
 }
 
 export async function getAppointmentFormOptions(isDemo: boolean) {

@@ -9,10 +9,11 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, inputClassName, selectClassName } from "@/components/ui/field";
+import { Pagination } from "@/components/ui/pagination";
 import { requireUser } from "@/lib/auth";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDateTime } from "@/lib/date";
-import { toSearchParam } from "@/lib/utils";
+import { toPositiveIntSearchParam, toSearchParam } from "@/lib/utils";
 import {
   markTodayAppointmentsAsAttendedAction,
   markTodayAppointmentsAsNoShowAction,
@@ -27,6 +28,7 @@ function buildAppointmentsFilterHref(
   statuses: AppointmentStatus[],
   date: string,
   dateScope: "day" | "all",
+  page = 1,
 ) {
   const params = new URLSearchParams();
 
@@ -38,6 +40,10 @@ function buildAppointmentsFilterHref(
     params.set("dateScope", "all");
   } else {
     params.set("date", date);
+  }
+
+  if (page > 1) {
+    params.set("page", String(page));
   }
 
   const query = params.toString();
@@ -67,6 +73,7 @@ export default async function AppointmentsPage({
   const selectedStatuses = getSelectedStatuses(params.status);
   const dateScope = toSearchParam(params.dateScope) === "all" ? "all" : "day";
   const selectedDate = toSearchParam(params.date) || today;
+  const requestedPage = toPositiveIntSearchParam(params.page);
   const success = toSearchParam(params.success);
   const error = toSearchParam(params.error);
   const appointments = await listAppointments(
@@ -74,8 +81,9 @@ export default async function AppointmentsPage({
     selectedStatuses,
     dateScope === "all" ? undefined : selectedDate,
     dateScope === "all",
+    requestedPage,
   );
-  const redirectPath = buildAppointmentsFilterHref(selectedStatuses, selectedDate, dateScope);
+  const redirectPath = buildAppointmentsFilterHref(selectedStatuses, selectedDate, dateScope, appointments.page);
   const showBulkTodayActions = dateScope === "day" && selectedDate === today;
   const filtersFormKey = `${dateScope}:${selectedDate}:${selectedStatuses.join(",")}`;
 
@@ -210,8 +218,8 @@ export default async function AppointmentsPage({
         />
 
         <div className="mt-6 space-y-4">
-          {appointments.length ? (
-            appointments.map((appointment) => (
+          {appointments.items.length ? (
+            appointments.items.map((appointment) => (
               <div key={appointment.id} className="rounded-3xl border border-line bg-white/70 p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-3">
@@ -296,6 +304,27 @@ export default async function AppointmentsPage({
           )}
         </div>
       </Card>
+
+      {appointments.totalPages > 1 ? (
+        <Pagination
+          currentPage={appointments.page}
+          totalPages={appointments.totalPages}
+          totalCount={appointments.totalCount}
+          pageSize={appointments.pageSize}
+          currentCount={appointments.items.length}
+          itemLabel="citas"
+          prevHref={
+            appointments.page > 1
+              ? buildAppointmentsFilterHref(selectedStatuses, selectedDate, dateScope, appointments.page - 1)
+              : undefined
+          }
+          nextHref={
+            appointments.page < appointments.totalPages
+              ? buildAppointmentsFilterHref(selectedStatuses, selectedDate, dateScope, appointments.page + 1)
+              : undefined
+          }
+        />
+      ) : null}
     </main>
   );
 }
