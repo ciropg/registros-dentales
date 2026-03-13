@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppointmentStatus } from "@prisma/client";
 import { format } from "date-fns";
+import { BulkStatusWarningForm } from "@/components/appointments/bulk-status-warning-form";
 import { Topbar } from "@/components/layout/topbar";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,11 @@ import { requireUser } from "@/lib/auth";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDateTime } from "@/lib/date";
 import { toSearchParam } from "@/lib/utils";
-import { updateAppointmentStatusAction } from "@/modules/appointments/actions";
+import {
+  markTodayAppointmentsAsAttendedAction,
+  markTodayAppointmentsAsNoShowAction,
+  updateAppointmentStatusAction,
+} from "@/modules/appointments/actions";
 import { listAppointments } from "@/modules/appointments/queries";
 
 const statusFilters = Object.values(AppointmentStatus);
@@ -71,6 +76,8 @@ export default async function AppointmentsPage({
     dateScope === "all",
   );
   const redirectPath = buildAppointmentsFilterHref(selectedStatuses, selectedDate, dateScope);
+  const showBulkTodayActions = dateScope === "day" && selectedDate === today;
+  const filtersFormKey = `${dateScope}:${selectedDate}:${selectedStatuses.join(",")}`;
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
@@ -113,9 +120,30 @@ export default async function AppointmentsPage({
           >
             Todas las citas
           </Link>
+          {showBulkTodayActions ? (
+            <BulkStatusWarningForm
+              date={selectedDate}
+              redirectPath={redirectPath}
+              buttonLabel="Marcar citas de hoy como asistio"
+              pendingLabel="Marcando asistio..."
+              confirmMessage="Se marcaran como asistio todas las citas de hoy con estado Agendada o Reprogramada. Verifica la agenda antes de continuar."
+              action={markTodayAppointmentsAsAttendedAction}
+            />
+          ) : null}
+          {showBulkTodayActions ? (
+            <BulkStatusWarningForm
+              date={selectedDate}
+              redirectPath={redirectPath}
+              buttonLabel="Marcar citas de hoy como no asistio"
+              pendingLabel="Marcando no asistio..."
+              confirmMessage="Se marcaran como no asistio todas las citas de hoy con estado Agendada o Reprogramada. Esta accion puede afectar el seguimiento del paciente."
+              variant="warning"
+              action={markTodayAppointmentsAsNoShowAction}
+            />
+          ) : null}
         </div>
 
-        <form className="mt-6 space-y-4">
+        <form key={filtersFormKey} className="mt-6 space-y-4">
           <div className="grid gap-3 md:grid-cols-[220px_auto]">
             <Field label="Fecha">
               <input className={inputClassName} type="date" name="date" defaultValue={selectedDate} />
@@ -155,7 +183,7 @@ export default async function AppointmentsPage({
               Todos los estados
             </Link>
             <Link
-              href={buildAppointmentsFilterHref(defaultStatusFilters, selectedDate, dateScope)}
+              href={buildAppointmentsFilterHref(defaultStatusFilters, today, "day")}
               className={buttonStyles({ variant: "secondary", size: "sm" })}
             >
               Restablecer por defecto

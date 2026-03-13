@@ -11,6 +11,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { canCreateTreatments, canManagePatients } from "@/lib/roles";
 import { appointmentStatusLabel, appointmentStatusTone, treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { formatDate, formatDateTime } from "@/lib/date";
 import { toSearchParam } from "@/lib/utils";
@@ -34,6 +35,8 @@ export default async function PatientDetailPage({
 
   const success = toSearchParam(query.success);
   const error = toSearchParam(query.error);
+  const showPatientManagementActions = canManagePatients(viewer.role);
+  const showTreatmentCreateActions = canCreateTreatments(viewer.role);
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
@@ -42,26 +45,32 @@ export default async function PatientDetailPage({
         description="Ficha del paciente con tratamientos vinculados, avance por fases e historial de citas."
         action={
           <div className="flex flex-wrap gap-3">
-            <Link href={`/patients/${patient.id}/edit`} className={buttonStyles({ variant: "secondary" })}>
-              Editar paciente
-            </Link>
-            <Link
-              href={`/treatments/new?patientId=${patient.id}`}
-              className={buttonStyles({ variant: "secondary" })}
-            >
-              Nuevo tratamiento
-            </Link>
+            {showPatientManagementActions ? (
+              <Link href={`/patients/${patient.id}/edit`} className={buttonStyles({ variant: "secondary" })}>
+                Editar paciente
+              </Link>
+            ) : null}
+            {showTreatmentCreateActions ? (
+              <Link
+                href={`/treatments/new?patientId=${patient.id}`}
+                className={buttonStyles({ variant: "secondary" })}
+              >
+                Nuevo tratamiento
+              </Link>
+            ) : null}
             <Link href={`/appointments/new?patientId=${patient.id}`} className={buttonStyles({})}>
               Nueva cita
             </Link>
-            <DeletePatientForm
-              patientId={patient.id}
-              patientName={`${patient.firstName} ${patient.lastName}`}
-              treatmentCount={patient.treatments.length}
-              appointmentCount={patient.appointments.length}
-              photoCount={patient.photos.length}
-              action={deletePatientAction}
-            />
+            {showPatientManagementActions ? (
+              <DeletePatientForm
+                patientId={patient.id}
+                patientName={`${patient.firstName} ${patient.lastName}`}
+                treatmentCount={patient.treatments.length}
+                appointmentCount={patient.appointments.length}
+                photoCount={patient.photos.length}
+                action={deletePatientAction}
+              />
+            ) : null}
           </div>
         }
       />
@@ -165,11 +174,11 @@ export default async function PatientDetailPage({
               <EmptyState
                 title="Sin tratamientos registrados"
                 description="Crea un tratamiento para empezar a medir tiempos y progreso."
-                action={
+                action={showTreatmentCreateActions ? (
                   <Link href={`/treatments/new?patientId=${patient.id}`} className={buttonStyles({})}>
                     Crear tratamiento
                   </Link>
-                }
+                ) : undefined}
               />
             )}
           </div>

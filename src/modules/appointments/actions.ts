@@ -1,5 +1,7 @@
 "use server";
 
+import { AppointmentStatus } from "@prisma/client";
+import { endOfDay, startOfDay } from "date-fns";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireBaseRole } from "@/lib/auth";
@@ -7,6 +9,7 @@ import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
 import {
+  appointmentBulkStatusSchema,
   appointmentCreateSchema,
   appointmentUpdateSchema,
   appointmentStatusUpdateSchema,
@@ -96,6 +99,29 @@ function revalidateAppointmentPaths(patientId: string, treatmentId?: string | nu
   revalidatePath(`/patients/${patientId}`);
 
   if (treatmentId) {
+    revalidatePath(`/treatments/${treatmentId}`);
+  }
+}
+
+function revalidateBulkAppointmentPaths(
+  appointments: Array<{
+    patientId: string;
+    treatmentId?: string | null;
+  }>,
+) {
+  revalidatePath("/appointments");
+  revalidatePath("/appointments/new");
+  revalidatePath("/dashboard");
+
+  for (const patientId of new Set(appointments.map((appointment) => appointment.patientId))) {
+    revalidatePath(`/patients/${patientId}`);
+  }
+
+  for (const treatmentId of new Set(
+    appointments
+      .map((appointment) => appointment.treatmentId)
+      .filter((treatmentId): treatmentId is string => Boolean(treatmentId)),
+  )) {
     revalidatePath(`/treatments/${treatmentId}`);
   }
 }
@@ -254,4 +280,154 @@ export async function updateAppointmentStatusAction(formData: FormData) {
   revalidateAppointmentPaths(appointment.patientId, appointment.treatmentId);
 
   redirect(appendSearchMessage(parsed.data.redirectPath, "success", "Estado de cita actualizado."));
+}
+
+export async function markTodayAppointmentsAsAttendedAction(formData: FormData) {
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+
+  const parsed = appointmentBulkStatusSchema.safeParse({
+    date: formData.get("date"),
+    redirectPath: formData.get("redirectPath"),
+  });
+
+  if (!parsed.success) {
+    redirect(`/appointments${buildErrorSearch("No se pudo actualizar las citas de hoy.")}`);
+  }
+
+  const normalizedDate = new Date(`${parsed.data.date}T00:00:00`);
+
+  if (Number.isNaN(normalizedDate.getTime())) {
+    redirect(appendSearchMessage(parsed.data.redirectPath, "error", "La fecha enviada no es valida."));
+  }
+
+  const appointmentsToUpdate = await prisma.appointment.findMany({
+    where: {
+      isDemo: user.isDemo,
+      scheduledAt: {
+        gte: startOfDay(normalizedDate),
+        lte: endOfDay(normalizedDate),
+      },
+      status: {
+        in: [AppointmentStatus.SCHEDULED, AppointmentStatus.RESCHEDULED],
+      },
+    },
+    select: {
+      id: true,
+      patientId: true,
+      treatmentId: true,
+    },
+  });
+
+  if (!appointmentsToUpdate.length) {
+    redirect(appendSearchMessage(parsed.data.redirectPath, "success", "No habia citas de hoy pendientes por marcar."));
+  }
+
+  await prisma.appointment.updateMany({
+    where: {
+      id: {
+        in: appointmentsToUpdate.map((appointment) => appointment.id),
+      },
+    },
+    data: {
+      status: AppointmentStatus.ATTENDED,
+    },
+  });
+
+  await Promise.all(
+    appointmentsToUpdate.map((appointment) =>
+      recordAudit({
+        actorId: user.id,
+        entityType: "appointment",
+        entityId: appointment.id,
+        action: "APPOINTMENT_STATUS_UPDATED",
+        description: "Cita actualizada a ATTENDED desde la accion masiva de agenda.",
+      }),
+    ),
+  );
+
+  revalidateBulkAppointmentPaths(appointmentsToUpdate);
+
+  redirect(
+    appendSearchMessage(
+      parsed.data.redirectPath,
+      "success",
+      `${appointmentsToUpdate.length} cita${appointmentsToUpdate.length === 1 ? "" : "s"} de hoy marcada${appointmentsToUpdate.length === 1 ? "" : "s"} como asistio.`,
+    ),
+  );
+}
+
+export async function markTodayAppointmentsAsNoShowAction(formData: FormData) {
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+
+  const parsed = appointmentBulkStatusSchema.safeParse({
+    date: formData.get("date"),
+    redirectPath: formData.get("redirectPath"),
+  });
+
+  if (!parsed.success) {
+    redirect(`/appointments${buildErrorSearch("No se pudo actualizar las citas de hoy.")}`);
+  }
+
+  const normalizedDate = new Date(`${parsed.data.date}T00:00:00`);
+
+  if (Number.isNaN(normalizedDate.getTime())) {
+    redirect(appendSearchMessage(parsed.data.redirectPath, "error", "La fecha enviada no es valida."));
+  }
+
+  const appointmentsToUpdate = await prisma.appointment.findMany({
+    where: {
+      isDemo: user.isDemo,
+      scheduledAt: {
+        gte: startOfDay(normalizedDate),
+        lte: endOfDay(normalizedDate),
+      },
+      status: {
+        in: [AppointmentStatus.SCHEDULED, AppointmentStatus.RESCHEDULED],
+      },
+    },
+    select: {
+      id: true,
+      patientId: true,
+      treatmentId: true,
+    },
+  });
+
+  if (!appointmentsToUpdate.length) {
+    redirect(
+      appendSearchMessage(parsed.data.redirectPath, "success", "No habia citas de hoy pendientes por marcar como no asistio."),
+    );
+  }
+
+  await prisma.appointment.updateMany({
+    where: {
+      id: {
+        in: appointmentsToUpdate.map((appointment) => appointment.id),
+      },
+    },
+    data: {
+      status: AppointmentStatus.NO_SHOW,
+    },
+  });
+
+  await Promise.all(
+    appointmentsToUpdate.map((appointment) =>
+      recordAudit({
+        actorId: user.id,
+        entityType: "appointment",
+        entityId: appointment.id,
+        action: "APPOINTMENT_STATUS_UPDATED",
+        description: "Cita actualizada a NO_SHOW desde la accion masiva de agenda.",
+      }),
+    ),
+  );
+
+  revalidateBulkAppointmentPaths(appointmentsToUpdate);
+
+  redirect(
+    appendSearchMessage(
+      parsed.data.redirectPath,
+      "success",
+      `${appointmentsToUpdate.length} cita${appointmentsToUpdate.length === 1 ? "" : "s"} de hoy marcada${appointmentsToUpdate.length === 1 ? "" : "s"} como no asistio.`,
+    ),
+  );
 }

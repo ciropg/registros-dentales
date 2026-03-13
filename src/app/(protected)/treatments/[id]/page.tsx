@@ -9,6 +9,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Field, selectClassName } from "@/components/ui/field";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { requireUser } from "@/lib/auth";
+import { canCreateTreatments, canUpdateTreatmentPhases } from "@/lib/roles";
 import {
   appointmentStatusLabel,
   appointmentStatusTone,
@@ -36,6 +37,8 @@ export default async function TreatmentDetailPage({
   const user = await requireUser();
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const treatment = await getTreatmentDetail(id, user.isDemo);
+  const canEditTreatmentData = canCreateTreatments(user.role);
+  const canEditPhases = canUpdateTreatmentPhases(user.role);
 
   if (!treatment) {
     notFound();
@@ -51,6 +54,14 @@ export default async function TreatmentDetailPage({
         description="Detalle del tratamiento con metricas de tiempo, progreso por fases y citas asociadas."
         action={
           <div className="flex flex-wrap gap-3">
+            {canEditTreatmentData ? (
+              <Link
+                href={`/treatments/${treatment.id}/edit`}
+                className={buttonStyles({ variant: "secondary" })}
+              >
+                Editar tratamiento
+              </Link>
+            ) : null}
             <Link
               href={`/patients/${treatment.patientId}`}
               className={buttonStyles({ variant: "secondary" })}
@@ -167,7 +178,11 @@ export default async function TreatmentDetailPage({
           <CardHeader
             eyebrow="Fases"
             title="Actualizar progreso"
-            description="Cada cambio recalcula automaticamente el porcentaje global del tratamiento."
+            description={
+              canEditPhases
+                ? "Cada cambio recalcula automaticamente el porcentaje global del tratamiento."
+                : "Este perfil puede consultar las fases, pero no actualizar su estado."
+            }
           />
 
           <div className="mt-6 space-y-4">
@@ -188,22 +203,24 @@ export default async function TreatmentDetailPage({
                   <Badge tone={phaseStatusTone(phase.status)}>{phaseStatusLabel(phase.status)}</Badge>
                 </div>
 
-                <form action={updatePhaseStatusAction} className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
-                  <input type="hidden" name="treatmentId" value={treatment.id} />
-                  <input type="hidden" name="phaseId" value={phase.id} />
-                  <Field label="Nuevo estado">
-                    <select className={selectClassName} name="status" defaultValue={phase.status}>
-                      {phaseOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {phaseStatusLabel(status)}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <button type="submit" className={buttonStyles({ className: "self-end" })}>
-                    Actualizar fase
-                  </button>
-                </form>
+                {canEditPhases ? (
+                  <form action={updatePhaseStatusAction} className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
+                    <input type="hidden" name="treatmentId" value={treatment.id} />
+                    <input type="hidden" name="phaseId" value={phase.id} />
+                    <Field label="Nuevo estado">
+                      <select className={selectClassName} name="status" defaultValue={phase.status}>
+                        {phaseOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {phaseStatusLabel(status)}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <button type="submit" className={buttonStyles({ className: "self-end" })}>
+                      Actualizar fase
+                    </button>
+                  </form>
+                ) : null}
               </div>
             ))}
           </div>

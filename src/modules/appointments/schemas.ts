@@ -33,3 +33,8 @@ export const appointmentStatusUpdateSchema = z.object({
   status: z.nativeEnum(AppointmentStatus),
   redirectPath: z.string().min(1),
 });
+
+export const appointmentBulkStatusSchema = z.object({
+  date: z.string().min(1, "No se pudo identificar la fecha."),
+  redirectPath: z.string().min(1),
+});

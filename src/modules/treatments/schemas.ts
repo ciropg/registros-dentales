@@ -45,6 +45,29 @@ export const treatmentCreateSchema = z
     }
   });
 
+export const treatmentUpdateSchema = z
+  .object({
+    treatmentId: z.string().min(1),
+    dentistId: z
+      .string()
+      .optional()
+      .transform((value) => value || undefined),
+    title: z.string().trim().min(3, "Ingresa el nombre del tratamiento."),
+    diagnosis: optionalTrimmedString(z.string()),
+    startDate: z.string().min(1, "Ingresa la fecha de inicio."),
+    estimatedEndDate: z.string().min(1, "Ingresa la fecha estimada de fin."),
+    notes: optionalTrimmedString(z.string().max(1000, "Notas demasiado largas.")),
+  })
+  .superRefine((value, context) => {
+    if (new Date(value.estimatedEndDate) <= new Date(value.startDate)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["estimatedEndDate"],
+        message: "La fecha final debe ser posterior a la fecha de inicio.",
+      });
+    }
+  });
+
 export const treatmentPhaseUpdateSchema = z.object({
   treatmentId: z.string().min(1),
   phaseId: z.string().min(1),

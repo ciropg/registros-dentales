@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "warning";
 type ButtonSize = "sm" | "md";
 
 const variantStyles: Record<ButtonVariant, string> = {
@@ -9,6 +9,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   secondary: "bg-white text-foreground border border-line hover:bg-violet-50",
   ghost: "bg-transparent text-foreground hover:bg-white/70",
   danger: "bg-danger text-white hover:bg-red-800",
+  warning: "bg-warning text-white hover:bg-amber-700",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

@@ -10,11 +10,12 @@ import { getConcreteRolesForBaseRoles } from "@/lib/roles";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
 import {
   treatmentCreateSchema,
+  treatmentUpdateSchema,
   treatmentPhaseUpdateSchema,
 } from "@/modules/treatments/schemas";
 
 export async function createTreatmentAction(formData: FormData) {
-  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT"]);
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
 
   let parsedPhases: unknown[] = [];
 
@@ -190,4 +191,95 @@ export async function updatePhaseStatusAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath(`/treatments/${phase.treatmentId}`);
   redirect(`/treatments/${phase.treatmentId}${buildSuccessSearch("Fase actualizada.")}`);
+}
+
+export async function updateTreatmentAction(formData: FormData) {
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const treatmentId = String(formData.get("treatmentId") ?? "");
+  const editRedirectPath = treatmentId ? `/treatments/${treatmentId}/edit` : "/dashboard";
+
+  const parsed = treatmentUpdateSchema.safeParse({
+    treatmentId: formData.get("treatmentId"),
+    dentistId: formData.get("dentistId"),
+    title: formData.get("title"),
+    diagnosis: formData.get("diagnosis"),
+    startDate: formData.get("startDate"),
+    estimatedEndDate: formData.get("estimatedEndDate"),
+    notes: formData.get("notes"),
+  });
+
+  if (!parsed.success) {
+    redirect(`${editRedirectPath}${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo actualizar el tratamiento.")}`);
+  }
+
+  const existingTreatment = await prisma.treatment.findFirst({
+    where: {
+      id: parsed.data.treatmentId,
+      isDemo: user.isDemo,
+    },
+    select: {
+      id: true,
+      patientId: true,
+    },
+  });
+
+  if (!existingTreatment) {
+    redirect(`/dashboard${buildErrorSearch("El tratamiento no existe en tu entorno.")}`);
+  }
+
+  let dentistId: string | undefined;
+
+  if (parsed.data.dentistId) {
+    const dentist = await prisma.user.findFirst({
+      where: {
+        id: parsed.data.dentistId,
+        isDemo: user.isDemo,
+        active: true,
+        role: {
+          in: getConcreteRolesForBaseRoles(["ADMIN", "DENTIST"]),
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!dentist) {
+      redirect(`${editRedirectPath}${buildErrorSearch("El responsable no existe en tu entorno.")}`);
+    }
+
+    dentistId = dentist.id;
+  }
+
+  const treatment = await prisma.treatment.update({
+    where: {
+      id: existingTreatment.id,
+    },
+    data: {
+      dentistId,
+      title: parsed.data.title,
+      diagnosis: parsed.data.diagnosis ?? "",
+      startDate: new Date(parsed.data.startDate),
+      estimatedEndDate: new Date(parsed.data.estimatedEndDate),
+      notes: parsed.data.notes,
+    },
+  });
+
+  await recordAudit({
+    actorId: user.id,
+    entityType: "treatment",
+    entityId: treatment.id,
+    action: "TREATMENT_UPDATED",
+    description: `Se actualizo el tratamiento ${treatment.title}.`,
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/patients");
+  revalidatePath("/appointments");
+  revalidatePath("/appointments/new");
+  revalidatePath(`/patients/${existingTreatment.patientId}`);
+  revalidatePath(`/treatments/${treatment.id}`);
+  revalidatePath(`/treatments/${treatment.id}/edit`);
+
+  redirect(`/treatments/${treatment.id}${buildSuccessSearch("Tratamiento actualizado correctamente.")}`);
 }

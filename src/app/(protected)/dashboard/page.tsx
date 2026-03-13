@@ -8,11 +8,14 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { daysLabel, formatDate } from "@/lib/date";
 import { requireUser } from "@/lib/auth";
+import { canCreateTreatments, canManagePatients } from "@/lib/roles";
 import { getDashboardData } from "@/modules/dashboard/queries";
 
 export default async function DashboardPage() {
   const user = await requireUser();
   const data = await getDashboardData(user.isDemo);
+  const showNewPatientAction = canManagePatients(user.role);
+  const showNewTreatmentAction = canCreateTreatments(user.role);
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
@@ -21,12 +24,16 @@ export default async function DashboardPage() {
         description="Vista operativa para monitorear tratamientos activos, porcentaje de avance y agenda diaria."
         action={
           <div className="flex flex-wrap gap-3">
-            <Link href="/patients/new" className={buttonStyles({ variant: "secondary" })}>
-              Nuevo paciente
-            </Link>
-            <Link href="/treatments/new" className={buttonStyles({ variant: "secondary" })}>
-              Nuevo tratamiento
-            </Link>
+            {showNewPatientAction ? (
+              <Link href="/patients/new" className={buttonStyles({ variant: "secondary" })}>
+                Nuevo paciente
+              </Link>
+            ) : null}
+            {showNewTreatmentAction ? (
+              <Link href="/treatments/new" className={buttonStyles({ variant: "secondary" })}>
+                Nuevo tratamiento
+              </Link>
+            ) : null}
             <Link href="/appointments/new" className={buttonStyles({})}>
               Nueva cita
             </Link>
@@ -75,11 +82,11 @@ export default async function DashboardPage() {
                 <EmptyState
                   title="Sin tratamientos activos"
                   description="Crea un tratamiento para empezar a monitorear su avance."
-                  action={
+                  action={showNewTreatmentAction ? (
                     <Link href="/treatments/new" className={buttonStyles({})}>
                       Crear tratamiento
                     </Link>
-                  }
+                  ) : undefined}
                 />
               </div>
             )}

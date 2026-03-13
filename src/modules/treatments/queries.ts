@@ -57,3 +57,28 @@ export async function getTreatmentFormOptions(isDemo: boolean) {
     dentists,
   };
 }
+
+export async function getTreatmentFormDetail(treatmentId: string, isDemo: boolean) {
+  return prisma.treatment.findFirst({
+    where: {
+      id: treatmentId,
+      isDemo,
+    },
+    select: {
+      id: true,
+      patientId: true,
+      title: true,
+      diagnosis: true,
+      startDate: true,
+      estimatedEndDate: true,
+      notes: true,
+      dentistId: true,
+      patient: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  });
+}

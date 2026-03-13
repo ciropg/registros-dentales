@@ -14,7 +14,7 @@ export default async function NewTreatmentPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT"]);
+  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
   const [params, options] = await Promise.all([searchParams, getTreatmentFormOptions(user.isDemo)]);
   const patientId = toSearchParam(params.patientId);
   const error = toSearchParam(params.error);

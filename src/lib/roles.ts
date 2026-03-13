@@ -114,3 +114,19 @@ export function isRoleAllowedForScope(role: UserRole, isDemo: boolean) {
 export function getRoleSortOrder(role: UserRole) {
   return BASE_ROLE_ORDER[getBaseRole(role)];
 }
+
+export function hasBaseRole(role: UserRole, allowedRoles: BaseUserRole[]) {
+  return allowedRoles.includes(getBaseRole(role));
+}
+
+export function canManagePatients(role: UserRole) {
+  return hasBaseRole(role, ["ADMIN", "ASSISTANT", "RECEPTIONIST"]);
+}
+
+export function canCreateTreatments(role: UserRole) {
+  return hasBaseRole(role, ["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+}
+
+export function canUpdateTreatmentPhases(role: UserRole) {
+  return hasBaseRole(role, ["ADMIN", "DENTIST", "ASSISTANT"]);
+}

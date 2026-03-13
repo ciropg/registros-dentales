@@ -10,6 +10,7 @@ import { inputClassName } from "@/components/ui/field";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { requireUser } from "@/lib/auth";
 import { daysLabel, formatDate } from "@/lib/date";
+import { canCreateTreatments, canManagePatients } from "@/lib/roles";
 import { treatmentStatusLabel, treatmentStatusTone } from "@/lib/status";
 import { toSearchParam } from "@/lib/utils";
 import { deletePatientAction } from "@/modules/patients/actions";
@@ -26,17 +27,19 @@ export default async function PatientsPage({
   const success = toSearchParam(params.success);
   const error = toSearchParam(params.error);
   const patients = await listPatients(user.isDemo, q);
+  const showPatientManagementActions = canManagePatients(user.role);
+  const showTreatmentCreateActions = canCreateTreatments(user.role);
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
       <Topbar
         title="Pacientes"
         description="Busqueda rapida de pacientes con resumen de citas y estado del tratamiento activo."
-        action={
+        action={showPatientManagementActions ? (
           <Link href="/patients/new" className={buttonStyles({})}>
             Nuevo paciente
           </Link>
-        }
+        ) : undefined}
       />
 
       {success ? <Alert message={success} tone="success" /> : null}
@@ -131,26 +134,32 @@ export default async function PatientsPage({
                 <Link href={`/patients/${patient.id}`} className={buttonStyles({})}>
                   Ver detalle
                 </Link>
-                <Link
-                  href={`/patients/${patient.id}/edit`}
-                  className={buttonStyles({ variant: "secondary" })}
-                >
-                  Editar
-                </Link>
-                <Link
-                  href={`/treatments/new?patientId=${patient.id}`}
-                  className={buttonStyles({ variant: "ghost" })}
-                >
-                  Nuevo tratamiento
-                </Link>
-                <DeletePatientForm
-                  patientId={patient.id}
-                  patientName={`${patient.firstName} ${patient.lastName}`}
-                  treatmentCount={patient.treatments.length}
-                  appointmentCount={patient._count.appointments}
-                  photoCount={patient._count.photos}
-                  action={deletePatientAction}
-                />
+                {showPatientManagementActions ? (
+                  <Link
+                    href={`/patients/${patient.id}/edit`}
+                    className={buttonStyles({ variant: "secondary" })}
+                  >
+                    Editar
+                  </Link>
+                ) : null}
+                {showTreatmentCreateActions ? (
+                  <Link
+                    href={`/treatments/new?patientId=${patient.id}`}
+                    className={buttonStyles({ variant: "ghost" })}
+                  >
+                    Nuevo tratamiento
+                  </Link>
+                ) : null}
+                {showPatientManagementActions ? (
+                  <DeletePatientForm
+                    patientId={patient.id}
+                    patientName={`${patient.firstName} ${patient.lastName}`}
+                    treatmentCount={patient.treatments.length}
+                    appointmentCount={patient._count.appointments}
+                    photoCount={patient._count.photos}
+                    action={deletePatientAction}
+                  />
+                ) : null}
               </div>
             </Card>
           ))
@@ -159,11 +168,11 @@ export default async function PatientsPage({
             <EmptyState
               title="No hay pacientes"
               description="Todavia no existen pacientes que coincidan con la busqueda."
-              action={
+              action={showPatientManagementActions ? (
                 <Link href="/patients/new" className={buttonStyles({})}>
                   Crear primer paciente
                 </Link>
-              }
+              ) : undefined}
             />
           </div>
         )}
