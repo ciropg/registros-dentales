@@ -7,13 +7,18 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { deletePatientImage, uploadPatientImage } from "@/lib/cloudinary";
 import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
+import { getCurrentLocale } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
 import {
   patientCreateFields,
   type PatientCreateActionState,
 } from "@/modules/patients/create-patient-form-state";
-import { patientCreateSchema, patientPhotoUploadSchema, patientUpdateSchema } from "@/modules/patients/schemas";
+import {
+  createPatientCreateSchema,
+  createPatientPhotoUploadSchema,
+  createPatientUpdateSchema,
+} from "@/modules/patients/schemas";
 
 const DEMO_PATIENT_PHOTO_LIMIT = 5;
 const MAX_PATIENT_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
@@ -264,9 +269,21 @@ export async function createPatientAction(
   _previousState: PatientCreateActionState,
   formData: FormData,
 ): Promise<PatientCreateActionState> {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "ASSISTANT", "RECEPTIONIST"]);
+  const copy = locale === "en"
+    ? {
+        fixFields: "Fix the highlighted fields.",
+        saveFailed: "The patient could not be saved.",
+        created: "Patient created successfully.",
+      }
+    : {
+        fixFields: "Corrige los campos marcados.",
+        saveFailed: "No se pudo guardar el paciente.",
+        created: "Paciente creado correctamente.",
+      };
 
-  const parsed = patientCreateSchema.safeParse({
+  const parsed = createPatientCreateSchema(locale).safeParse({
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
     documentNumber: formData.get("documentNumber"),
@@ -278,7 +295,7 @@ export async function createPatientAction(
 
   if (!parsed.success) {
     return {
-      message: "Corrige los campos marcados.",
+      message: copy.fixFields,
       fieldErrors: buildPatientCreateFieldErrors(parsed.error.flatten().fieldErrors),
     };
   }
@@ -291,7 +308,7 @@ export async function createPatientAction(
 
     if (duplicateFieldErrors) {
       return {
-        message: "Corrige los campos marcados.",
+        message: copy.fixFields,
         fieldErrors: duplicateFieldErrors,
       };
     }
@@ -313,7 +330,7 @@ export async function createPatientAction(
     });
 
     revalidatePatientPaths(patient.id);
-    redirect(`/patients/${patient.id}${buildSuccessSearch("Paciente creado correctamente.")}`);
+    redirect(`/patients/${patient.id}${buildSuccessSearch(copy.created)}`);
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
@@ -321,14 +338,14 @@ export async function createPatientAction(
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return {
-        message: "Corrige los campos marcados.",
+        message: copy.fixFields,
         fieldErrors: getPatientUniqueConstraintFieldErrors(error),
       };
     }
 
     console.error("Patient create failed", error);
     return {
-      message: "No se pudo guardar el paciente.",
+      message: copy.saveFailed,
       fieldErrors: {},
     };
   }
@@ -338,9 +355,21 @@ export async function updatePatientAction(
   _previousState: PatientCreateActionState,
   formData: FormData,
 ): Promise<PatientCreateActionState> {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "ASSISTANT", "RECEPTIONIST"]);
+  const copy = locale === "en"
+    ? {
+        fixFields: "Fix the highlighted fields.",
+        updateFailed: "The patient could not be updated.",
+        updated: "Patient updated successfully.",
+      }
+    : {
+        fixFields: "Corrige los campos marcados.",
+        updateFailed: "No se pudo actualizar el paciente.",
+        updated: "Paciente actualizado correctamente.",
+      };
 
-  const parsed = patientUpdateSchema.safeParse({
+  const parsed = createPatientUpdateSchema(locale).safeParse({
     patientId: formData.get("patientId"),
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
@@ -353,7 +382,7 @@ export async function updatePatientAction(
 
   if (!parsed.success) {
     return {
-      message: "Corrige los campos marcados.",
+      message: copy.fixFields,
       fieldErrors: buildPatientCreateFieldErrors(parsed.error.flatten().fieldErrors),
     };
   }
@@ -372,7 +401,7 @@ export async function updatePatientAction(
 
     if (duplicateFieldErrors) {
       return {
-        message: "Corrige los campos marcados.",
+        message: copy.fixFields,
         fieldErrors: duplicateFieldErrors,
       };
     }
@@ -401,7 +430,7 @@ export async function updatePatientAction(
     });
 
     revalidatePatientPaths(patient.id);
-    redirect(`${getPatientRedirectPath(patient.id)}${buildSuccessSearch("Paciente actualizado correctamente.")}`);
+    redirect(`${getPatientRedirectPath(patient.id)}${buildSuccessSearch(copy.updated)}`);
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
@@ -409,14 +438,14 @@ export async function updatePatientAction(
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return {
-        message: "Corrige los campos marcados.",
+        message: copy.fixFields,
         fieldErrors: getPatientUniqueConstraintFieldErrors(error),
       };
     }
 
     console.error("Patient update failed", error);
 
-    redirect(`${redirectPath}${buildErrorSearch("No se pudo actualizar el paciente.")}`);
+    redirect(`${redirectPath}${buildErrorSearch(copy.updateFailed)}`);
   }
 }
 
@@ -512,6 +541,7 @@ export async function deletePatientAction(formData: FormData) {
 }
 
 export async function uploadPatientPhotoAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
   const patientId = String(formData.get("patientId") ?? "");
   const redirectPath = patientId ? getPatientRedirectPath(patientId) : "/patients";
@@ -526,7 +556,7 @@ export async function uploadPatientPhotoAction(formData: FormData) {
     redirect(`${redirectPath}${buildErrorSearch(parsedFile.error)}`);
   }
 
-  const parsedMetadata = patientPhotoUploadSchema.safeParse({
+  const parsedMetadata = createPatientPhotoUploadSchema(locale).safeParse({
     description: formData.get("description"),
   });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/components/providers/locale-provider";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 
 type DeletePatientFormProps = {
@@ -19,21 +20,26 @@ export function DeletePatientForm({
   photoCount,
   action,
 }: DeletePatientFormProps) {
+  const locale = useLocale();
   const hasRelatedData = treatmentCount || appointmentCount || photoCount;
   const relationMessage = hasRelatedData
-    ? `Esto tambien eliminara ${treatmentCount} tratamiento(s), ${appointmentCount} cita(s) y ${photoCount} foto(s) asociadas.`
-    : "Esta accion eliminara el paciente de forma permanente.";
+    ? locale === "en"
+      ? `This will also delete ${treatmentCount} treatment(s), ${appointmentCount} appointment(s), and ${photoCount} linked photo(s).`
+      : `Esto tambien eliminara ${treatmentCount} tratamiento(s), ${appointmentCount} cita(s) y ${photoCount} foto(s) asociadas.`
+    : locale === "en"
+      ? "This action will permanently delete the patient."
+      : "Esta accion eliminara el paciente de forma permanente.";
 
   return (
     <ConfirmActionForm
       action={action}
       hiddenFields={[{ name: "patientId", value: patientId }]}
-      submitLabel="Eliminar paciente"
-      pendingLabel="Eliminando..."
+      submitLabel={locale === "en" ? "Delete patient" : "Eliminar paciente"}
+      pendingLabel={locale === "en" ? "Deleting..." : "Eliminando..."}
       submitVariant="danger"
-      confirmTitle={`Eliminar a ${patientName}`}
+      confirmTitle={locale === "en" ? `Delete ${patientName}` : `Eliminar a ${patientName}`}
       confirmDescription={relationMessage}
-      confirmButtonLabel="Si, eliminar"
+      confirmButtonLabel={locale === "en" ? "Yes, delete" : "Si, eliminar"}
       confirmButtonVariant="danger"
       confirmTone="danger"
     />

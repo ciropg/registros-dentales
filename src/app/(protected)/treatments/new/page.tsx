@@ -5,6 +5,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 import { requireBaseRole } from "@/lib/auth";
+import { getCurrentLocale } from "@/lib/i18n/server";
 import { toSearchParam } from "@/lib/utils";
 import { createTreatmentAction } from "@/modules/treatments/actions";
 import { getTreatmentFormOptions } from "@/modules/treatments/queries";
@@ -14,26 +15,67 @@ export default async function NewTreatmentPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const [user, locale] = await Promise.all([
+    requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]),
+    getCurrentLocale(),
+  ]);
   const [params, options] = await Promise.all([searchParams, getTreatmentFormOptions(user.isDemo)]);
   const patientId = toSearchParam(params.patientId);
   const error = toSearchParam(params.error);
+  const copy = locale === "en"
+    ? {
+        title: "New treatment",
+        description: "Configure the treatment, estimated dates, and phases that will drive the progress percentage.",
+        patient: "Patient",
+        selectPatient: "Select a patient",
+        responsible: "Responsible",
+        unassigned: "Unassigned",
+        treatmentName: "Treatment name",
+        treatmentPlaceholder: "Example: Full orthodontics",
+        startDate: "Start date",
+        estimatedEndDate: "Estimated end date",
+        diagnosis: "Diagnosis",
+        optional: "Optional.",
+        diagnosisPlaceholder: "Short clinical diagnosis",
+        notes: "Operational notes",
+        notesPlaceholder: "Checkup frequency, recommendations, or restrictions",
+        phasePlan: "Phase plan",
+        phaseDescription: "Progress percentage is calculated based on completed phases and their relative weight.",
+        save: "Save treatment",
+      }
+    : {
+        title: "Nuevo tratamiento",
+        description: "Configura el tratamiento, las fechas estimadas y las fases que alimentaran el porcentaje de avance.",
+        patient: "Paciente",
+        selectPatient: "Selecciona un paciente",
+        responsible: "Responsable",
+        unassigned: "Sin asignar",
+        treatmentName: "Nombre del tratamiento",
+        treatmentPlaceholder: "Ejemplo: Ortodoncia integral",
+        startDate: "Fecha de inicio",
+        estimatedEndDate: "Fecha estimada de fin",
+        diagnosis: "Diagnostico",
+        optional: "Opcional.",
+        diagnosisPlaceholder: "Diagnostico clinico resumido",
+        notes: "Notas operativas",
+        notesPlaceholder: "Frecuencia de control, recomendaciones o restricciones",
+        phasePlan: "Plan de fases",
+        phaseDescription: "El porcentaje de avance se calcula en funcion de las fases completadas y su peso relativo.",
+        save: "Guardar tratamiento",
+      };
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
-      <Topbar
-        title="Nuevo tratamiento"
-        description="Configura el tratamiento, las fechas estimadas y las fases que alimentaran el porcentaje de avance."
-      />
+      <Topbar title={copy.title} description={copy.description} locale={locale} />
 
       <Card>
         <form action={createTreatmentAction} className="space-y-6">
           {error ? <Alert message={error} tone="danger" /> : null}
 
           <div className="grid gap-5 md:grid-cols-2">
-            <Field label="Paciente">
+            <Field label={copy.patient}>
               <select className={selectClassName} name="patientId" defaultValue={patientId ?? ""} required>
-                <option value="">Selecciona un paciente</option>
+                <option value="">{copy.selectPatient}</option>
                 {options.patients.map((patient) => (
                   <option key={patient.id} value={patient.id}>
                     {patient.lastName}, {patient.firstName}
@@ -41,9 +83,9 @@ export default async function NewTreatmentPage({
                 ))}
               </select>
             </Field>
-            <Field label="Responsable">
+            <Field label={copy.responsible}>
               <select className={selectClassName} name="dentistId" defaultValue="">
-                <option value="">Sin asignar</option>
+                <option value="">{copy.unassigned}</option>
                 {options.dentists.map((dentist) => (
                   <option key={dentist.id} value={dentist.id}>
                     {dentist.name}
@@ -51,46 +93,44 @@ export default async function NewTreatmentPage({
                 ))}
               </select>
             </Field>
-            <Field label="Nombre del tratamiento">
-              <input className={inputClassName} name="title" placeholder="Ejemplo: Ortodoncia integral" required />
+            <Field label={copy.treatmentName}>
+              <input className={inputClassName} name="title" placeholder={copy.treatmentPlaceholder} required />
             </Field>
-            <Field label="Fecha de inicio">
+            <Field label={copy.startDate}>
               <input className={inputClassName} type="date" name="startDate" required />
             </Field>
-            <Field label="Fecha estimada de fin">
+            <Field label={copy.estimatedEndDate}>
               <input className={inputClassName} type="date" name="estimatedEndDate" required />
             </Field>
             <div />
           </div>
 
-          <Field label="Diagnostico" hint="Opcional.">
+          <Field label={copy.diagnosis} hint={copy.optional}>
             <textarea
               className={textareaClassName}
               name="diagnosis"
-              placeholder="Diagnostico clinico resumido"
+              placeholder={copy.diagnosisPlaceholder}
             />
           </Field>
 
-          <Field label="Notas operativas" hint="Opcional.">
+          <Field label={copy.notes} hint={copy.optional}>
             <textarea
               className={textareaClassName}
               name="notes"
-              placeholder="Frecuencia de control, recomendaciones o restricciones"
+              placeholder={copy.notesPlaceholder}
             />
           </Field>
 
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-semibold text-foreground">Plan de fases</p>
-              <p className="mt-1 text-sm text-muted">
-                El porcentaje de avance se calcula en funcion de las fases completadas y su peso relativo.
-              </p>
+              <p className="text-sm font-semibold text-foreground">{copy.phasePlan}</p>
+              <p className="mt-1 text-sm text-muted">{copy.phaseDescription}</p>
             </div>
             <PhasePlanner />
           </div>
 
           <button type="submit" className={buttonStyles({})}>
-            Guardar tratamiento
+            {copy.save}
           </button>
         </form>
       </Card>

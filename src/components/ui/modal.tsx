@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useId } from "react";
+import { useLocale } from "@/components/providers/locale-provider";
 import { buttonStyles } from "@/components/ui/button";
+import { getMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 
 export type ModalTone = "neutral" | "warning" | "danger" | "success";
@@ -28,6 +30,8 @@ export function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const locale = useLocale();
+  const copy = getMessages(locale);
   const titleId = useId();
   const descriptionId = useId();
 
@@ -57,7 +61,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
-        aria-label="Cerrar modal"
+        aria-label={copy.modal.overlayClose}
         className="absolute inset-0 bg-foreground/20 backdrop-blur-sm"
         onClick={onClose}
       />
@@ -71,7 +75,7 @@ export function Modal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <span className={cn("inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]", toneStyles[tone])}>
-              Confirmacion
+              {copy.modal.badge}
             </span>
             <h2 id={titleId} className="mt-4 text-2xl text-foreground">
               {title}
@@ -84,7 +88,7 @@ export function Modal({
           </div>
 
           <button type="button" className={buttonStyles({ variant: "ghost", size: "sm" })} onClick={onClose}>
-            Cerrar
+            {copy.modal.close}
           </button>
         </div>
 

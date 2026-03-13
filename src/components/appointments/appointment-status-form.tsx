@@ -3,6 +3,7 @@
 import { AppointmentStatus } from "@prisma/client";
 import { format } from "date-fns";
 import { useState } from "react";
+import { useLocale } from "@/components/providers/locale-provider";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { Field, inputClassName, selectClassName } from "@/components/ui/field";
 import { formatDateTime } from "@/lib/date";
@@ -33,6 +34,36 @@ export function AppointmentStatusForm({
   submitClassName?: string;
   fieldLabel: string;
 }) {
+  const locale = useLocale();
+  const copy = locale === "en"
+    ? {
+        rescheduleTitle: "Confirm appointment reschedule",
+        statusTitle: "Confirm status change",
+        rescheduleFallback: "the selected date",
+        rescheduleButton: "Yes, reschedule",
+        saveButton: "Yes, save",
+        newDateTime: "New date and time",
+        newDateTimeHint: (currentDate: string) =>
+          `The current appointment is ${currentDate}. The same appointment will be updated with the date you select here.`,
+        rescheduleDescription: (patientName: string, value: string) =>
+          `The appointment for ${patientName} will be rescheduled to ${value}.`,
+        statusDescription: (patientName: string, status: string) =>
+          `The appointment for ${patientName} will be updated to ${status}.`,
+      }
+    : {
+        rescheduleTitle: "Confirmar reprogramacion de cita",
+        statusTitle: "Confirmar cambio de estado",
+        rescheduleFallback: "la fecha seleccionada",
+        rescheduleButton: "Si, reprogramar",
+        saveButton: "Si, guardar",
+        newDateTime: "Nueva fecha y hora",
+        newDateTimeHint: (currentDate: string) =>
+          `La cita actual es ${currentDate}. La misma cita se actualizara con la fecha que selecciones aqui.`,
+        rescheduleDescription: (patientName: string, value: string) =>
+          `La cita de ${patientName} quedara como reprogramada para ${value}.`,
+        statusDescription: (patientName: string, status: string) =>
+          `Se actualizara la cita de ${patientName} al estado ${status}.`,
+      };
   const [status, setStatus] = useState(currentStatus);
   const [rescheduledAt, setRescheduledAt] = useState("");
   const requiresRescheduledAt = status === AppointmentStatus.RESCHEDULED && currentStatus !== AppointmentStatus.RESCHEDULED;
@@ -49,13 +80,13 @@ export function AppointmentStatusForm({
       submitLabel={submitLabel}
       pendingLabel={pendingLabel}
       submitClassName={submitClassName}
-      confirmTitle={requiresRescheduledAt ? "Confirmar reprogramacion de cita" : "Confirmar cambio de estado"}
+      confirmTitle={requiresRescheduledAt ? copy.rescheduleTitle : copy.statusTitle}
       confirmDescription={
         requiresRescheduledAt
-          ? `La cita de ${patientName} quedara como reprogramada para ${formattedRescheduledAt ?? "la fecha seleccionada"}.`
-          : `Se actualizara la cita de ${patientName} al estado ${appointmentStatusLabel(status).toLowerCase()}.`
+          ? copy.rescheduleDescription(patientName, formattedRescheduledAt ?? copy.rescheduleFallback)
+          : copy.statusDescription(patientName, appointmentStatusLabel(status, locale).toLowerCase())
       }
-      confirmButtonLabel={requiresRescheduledAt ? "Si, reprogramar" : "Si, guardar"}
+      confirmButtonLabel={requiresRescheduledAt ? copy.rescheduleButton : copy.saveButton}
       confirmTone={requiresRescheduledAt ? "warning" : "neutral"}
       confirmButtonVariant={requiresRescheduledAt ? "warning" : "primary"}
     >
@@ -63,7 +94,7 @@ export function AppointmentStatusForm({
         <select className={selectClassName} name="status" value={status} onChange={(event) => setStatus(event.target.value as AppointmentStatus)}>
           {Object.values(AppointmentStatus).map((option) => (
             <option key={option} value={option}>
-              {appointmentStatusLabel(option)}
+              {appointmentStatusLabel(option, locale)}
             </option>
           ))}
         </select>
@@ -71,8 +102,8 @@ export function AppointmentStatusForm({
 
       {requiresRescheduledAt ? (
         <Field
-          label="Nueva fecha y hora"
-          hint={`La cita actual es ${formatDateTime(scheduledAt)}. La misma cita se actualizara con la fecha que selecciones aqui.`}
+          label={copy.newDateTime}
+          hint={copy.newDateTimeHint(formatDateTime(scheduledAt))}
         >
           <input
             className={inputClassName}

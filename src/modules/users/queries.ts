@@ -1,12 +1,14 @@
+import type { Locale } from "@/lib/i18n/config";
 import { prisma } from "@/lib/prisma";
 import {
   getEnvironmentLabel,
   getRoleLabel,
+  getRoleDescription,
   getRoleSortOrder,
 } from "@/lib/roles";
 import { getManagedRoleScopeWhere, getManagedUserScopeWhere } from "@/modules/users/scope";
 
-export async function listManagedUsers(actorIsDemo: boolean) {
+export async function listManagedUsers(actorIsDemo: boolean, locale: Locale = "es") {
   const scopeWhere = getManagedUserScopeWhere(actorIsDemo);
 
   const [users, totalCount, activeCount] = await Promise.all([
@@ -42,13 +44,13 @@ export async function listManagedUsers(actorIsDemo: boolean) {
     },
     users: users.map((user) => ({
       ...user,
-      roleLabel: getRoleLabel(user.role),
-      environmentLabel: getEnvironmentLabel(user.isDemo),
+      roleLabel: getRoleLabel(user.role, locale),
+      environmentLabel: getEnvironmentLabel(user.isDemo, locale),
     })),
   };
 }
 
-export async function getManagedUserDetail(userId: string, actorIsDemo: boolean) {
+export async function getManagedUserDetail(userId: string, actorIsDemo: boolean, locale: Locale = "es") {
   const user = await prisma.user.findFirst({
     where: {
       id: userId,
@@ -78,18 +80,16 @@ export async function getManagedUserDetail(userId: string, actorIsDemo: boolean)
 
   return {
     ...user,
-    roleLabel: getRoleLabel(user.role),
-    environmentLabel: getEnvironmentLabel(user.isDemo),
+    roleLabel: getRoleLabel(user.role, locale),
+    environmentLabel: getEnvironmentLabel(user.isDemo, locale),
   };
 }
 
-export async function getManagedRoleOptions(actorIsDemo: boolean) {
+export async function getManagedRoleOptions(actorIsDemo: boolean, locale: Locale = "es") {
   const roles = await prisma.role.findMany({
     where: getManagedRoleScopeWhere(actorIsDemo),
     select: {
       code: true,
-      name: true,
-      description: true,
       isDemo: true,
     },
   });
@@ -102,5 +102,9 @@ export async function getManagedRoleOptions(actorIsDemo: boolean) {
     }
 
     return Number(left.isDemo) - Number(right.isDemo);
-  });
+  }).map((role) => ({
+    ...role,
+    name: getRoleLabel(role.code, locale),
+    description: getRoleDescription(role.code, locale),
+  }));
 }

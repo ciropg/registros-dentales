@@ -1,4 +1,6 @@
 import { UserRole } from "@prisma/client";
+import { getMessages } from "@/lib/i18n/messages";
+import type { Locale } from "@/lib/i18n/config";
 
 export type BaseUserRole = "ADMIN" | "DENTIST" | "ASSISTANT" | "RECEPTIONIST";
 
@@ -75,12 +77,12 @@ export function getRoleMetadata(role: UserRole) {
   return ROLE_METADATA[role];
 }
 
-export function getRoleLabel(role: UserRole) {
-  return getRoleMetadata(role).label;
+export function getRoleLabel(role: UserRole, locale: Locale = "es") {
+  return getMessages(locale).roles[role].label;
 }
 
-export function getRoleDescription(role: UserRole) {
-  return getRoleMetadata(role).description;
+export function getRoleDescription(role: UserRole, locale: Locale = "es") {
+  return getMessages(locale).roles[role].description;
 }
 
 export function getBaseRole(role: UserRole) {
@@ -91,8 +93,9 @@ export function isDemoRole(role: UserRole) {
   return getRoleMetadata(role).isDemo;
 }
 
-export function getEnvironmentLabel(isDemo: boolean) {
-  return isDemo ? "Demo" : "Real";
+export function getEnvironmentLabel(isDemo: boolean, locale: Locale = "es") {
+  const copy = getMessages(locale);
+  return isDemo ? copy.environment.demo : copy.environment.real;
 }
 
 export function canManageUsers(role: UserRole) {

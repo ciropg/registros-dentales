@@ -3,48 +3,19 @@ import {
   PhaseStatus,
   TreatmentStatus,
 } from "@prisma/client";
+import { getMessages } from "@/lib/i18n/messages";
+import type { Locale } from "@/lib/i18n/config";
 
-export function treatmentStatusLabel(status: TreatmentStatus) {
-  switch (status) {
-    case TreatmentStatus.PLANNED:
-      return "Planificado";
-    case TreatmentStatus.IN_PROGRESS:
-      return "En curso";
-    case TreatmentStatus.PAUSED:
-      return "Pausado";
-    case TreatmentStatus.COMPLETED:
-      return "Completado";
-    case TreatmentStatus.CANCELED:
-      return "Cancelado";
-  }
+export function treatmentStatusLabel(status: TreatmentStatus, locale: Locale = "es") {
+  return getMessages(locale).status.treatment[status];
 }
 
-export function phaseStatusLabel(status: PhaseStatus) {
-  switch (status) {
-    case PhaseStatus.PENDING:
-      return "Pendiente";
-    case PhaseStatus.IN_PROGRESS:
-      return "En curso";
-    case PhaseStatus.COMPLETED:
-      return "Completada";
-    case PhaseStatus.SKIPPED:
-      return "Omitida";
-  }
+export function phaseStatusLabel(status: PhaseStatus, locale: Locale = "es") {
+  return getMessages(locale).status.phase[status];
 }
 
-export function appointmentStatusLabel(status: AppointmentStatus) {
-  switch (status) {
-    case AppointmentStatus.SCHEDULED:
-      return "Agendada";
-    case AppointmentStatus.ATTENDED:
-      return "Asistio";
-    case AppointmentStatus.NO_SHOW:
-      return "No asistio";
-    case AppointmentStatus.RESCHEDULED:
-      return "Reprogramada";
-    case AppointmentStatus.CANCELED:
-      return "Cancelada";
-  }
+export function appointmentStatusLabel(status: AppointmentStatus, locale: Locale = "es") {
+  return getMessages(locale).status.appointment[status];
 }
 
 export function treatmentStatusTone(status: TreatmentStatus) {

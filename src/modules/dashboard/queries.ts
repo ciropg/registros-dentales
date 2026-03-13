@@ -1,5 +1,6 @@
 import { AppointmentStatus, TreatmentStatus } from "@prisma/client";
 import { addDays, endOfDay, startOfDay } from "date-fns";
+import type { Locale } from "@/lib/i18n/config";
 import { prisma } from "@/lib/prisma";
 import {
   appointmentStatusLabel,
@@ -9,7 +10,7 @@ import {
 } from "@/lib/status";
 import { calculateTreatmentMetrics } from "@/modules/treatments/calculators";
 
-export async function getDashboardData(isDemo: boolean) {
+export async function getDashboardData(isDemo: boolean, locale: Locale = "es") {
   const today = new Date();
   const startToday = startOfDay(today);
   const endToday = endOfDay(today);
@@ -116,7 +117,7 @@ export async function getDashboardData(isDemo: boolean) {
         progressPercent: metrics.progressPercent,
         daysElapsed: metrics.daysElapsed,
         daysRemaining: metrics.daysRemaining,
-        statusLabel: treatmentStatusLabel(treatment.status),
+        statusLabel: treatmentStatusLabel(treatment.status, locale),
         statusTone: treatmentStatusTone(treatment.status),
       };
     }),
@@ -124,7 +125,7 @@ export async function getDashboardData(isDemo: boolean) {
       id: appointment.id,
       patientName: `${appointment.patient.firstName} ${appointment.patient.lastName}`,
       reason: appointment.reason,
-      statusLabel: appointmentStatusLabel(appointment.status),
+      statusLabel: appointmentStatusLabel(appointment.status, locale),
       statusTone: appointmentStatusTone(appointment.status),
       scheduledAt: appointment.scheduledAt,
     })),
@@ -133,7 +134,7 @@ export async function getDashboardData(isDemo: boolean) {
       title: treatment.title,
       patientName: `${treatment.patient.firstName} ${treatment.patient.lastName}`,
       ...calculateTreatmentMetrics(treatment),
-      statusLabel: treatmentStatusLabel(treatment.status),
+      statusLabel: treatmentStatusLabel(treatment.status, locale),
       statusTone: treatmentStatusTone(treatment.status),
     })),
   };

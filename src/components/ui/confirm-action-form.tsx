@@ -2,8 +2,10 @@
 
 import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { useLocale } from "@/components/providers/locale-provider";
 import { type ButtonSize, type ButtonVariant, buttonStyles } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { getMessages } from "@/lib/i18n/messages";
 
 type HiddenField = {
   name: string;
@@ -44,8 +46,8 @@ export function ConfirmActionForm({
   submitClassName,
   confirmTitle,
   confirmDescription,
-  confirmButtonLabel = "Confirmar",
-  cancelButtonLabel = "Cancelar",
+  confirmButtonLabel,
+  cancelButtonLabel,
   confirmButtonVariant = "primary",
   confirmTone = "neutral",
 }: {
@@ -65,9 +67,13 @@ export function ConfirmActionForm({
   confirmButtonVariant?: ButtonVariant;
   confirmTone?: "neutral" | "warning" | "danger";
 }) {
+  const locale = useLocale();
+  const copy = getMessages(locale);
   const formRef = useRef<HTMLFormElement>(null);
   const shouldSubmitRef = useRef(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const resolvedConfirmButtonLabel = confirmButtonLabel ?? copy.confirmAction.confirm;
+  const resolvedCancelButtonLabel = cancelButtonLabel ?? copy.confirmAction.cancel;
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     if (shouldSubmitRef.current) {
@@ -114,14 +120,14 @@ export function ConfirmActionForm({
             className={buttonStyles({ variant: confirmButtonVariant })}
             onClick={handleConfirm}
           >
-            {confirmButtonLabel}
+            {resolvedConfirmButtonLabel}
           </button>
           <button
             type="button"
             className={buttonStyles({ variant: "secondary" })}
             onClick={() => setIsModalOpen(false)}
           >
-            {cancelButtonLabel}
+            {resolvedCancelButtonLabel}
           </button>
         </div>
       </Modal>

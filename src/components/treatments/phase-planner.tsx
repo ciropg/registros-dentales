@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocale } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Field, inputClassName } from "@/components/ui/field";
 
@@ -10,14 +11,42 @@ type PhaseDraft = {
   plannedDate: string;
 };
 
-const initialPhases: PhaseDraft[] = [
-  { name: "Diagnostico", weight: 2, plannedDate: "" },
-  { name: "Ejecucion", weight: 4, plannedDate: "" },
-  { name: "Control final", weight: 2, plannedDate: "" },
-];
-
 export function PhasePlanner() {
-  const [phases, setPhases] = useState<PhaseDraft[]>(initialPhases);
+  const locale = useLocale();
+  const copy = locale === "en"
+    ? {
+        phaseLabel: (index: number) => `Phase ${index}`,
+        phaseDescription: "Define name, weight, and tentative milestone.",
+        remove: "Remove",
+        name: "Phase name",
+        namePlaceholder: "Example: Alignment",
+        weight: "Weight",
+        plannedDate: "Planned date",
+        optional: "Optional.",
+        addPhase: "Add phase",
+        initialPhases: [
+          { name: "Diagnosis", weight: 2, plannedDate: "" },
+          { name: "Execution", weight: 4, plannedDate: "" },
+          { name: "Final check", weight: 2, plannedDate: "" },
+        ] satisfies PhaseDraft[],
+      }
+    : {
+        phaseLabel: (index: number) => `Fase ${index}`,
+        phaseDescription: "Define nombre, peso e hito tentativo.",
+        remove: "Quitar",
+        name: "Nombre de fase",
+        namePlaceholder: "Ejemplo: Alineacion",
+        weight: "Peso",
+        plannedDate: "Fecha planificada",
+        optional: "Opcional.",
+        addPhase: "Agregar fase",
+        initialPhases: [
+          { name: "Diagnostico", weight: 2, plannedDate: "" },
+          { name: "Ejecucion", weight: 4, plannedDate: "" },
+          { name: "Control final", weight: 2, plannedDate: "" },
+        ] satisfies PhaseDraft[],
+      };
+  const [phases, setPhases] = useState<PhaseDraft[]>(copy.initialPhases);
 
   const serialized = useMemo(() => JSON.stringify(phases.filter((phase) => phase.name.trim())), [phases]);
 
@@ -50,26 +79,26 @@ export function PhasePlanner() {
         <div key={`${phase.name}-${index}`} className="rounded-3xl border border-line bg-white/70 p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-foreground">Fase {index + 1}</p>
-              <p className="text-xs text-muted">Define nombre, peso e hito tentativo.</p>
+              <p className="text-sm font-semibold text-foreground">{copy.phaseLabel(index + 1)}</p>
+              <p className="text-xs text-muted">{copy.phaseDescription}</p>
             </div>
             {phases.length > 1 ? (
               <Button type="button" variant="ghost" size="sm" onClick={() => removePhase(index)}>
-                Quitar
+                {copy.remove}
               </Button>
             ) : null}
           </div>
 
           <div className="grid gap-4 md:grid-cols-[1.7fr_0.7fr_1fr]">
-            <Field label="Nombre de fase">
+            <Field label={copy.name}>
               <input
                 className={inputClassName}
                 value={phase.name}
                 onChange={(event) => updatePhase(index, "name", event.target.value)}
-                placeholder="Ejemplo: Alineacion"
+                placeholder={copy.namePlaceholder}
               />
             </Field>
-            <Field label="Peso">
+            <Field label={copy.weight}>
               <input
                 className={inputClassName}
                 type="number"
@@ -78,7 +107,7 @@ export function PhasePlanner() {
                 onChange={(event) => updatePhase(index, "weight", event.target.value)}
               />
             </Field>
-            <Field label="Fecha planificada" hint="Opcional.">
+            <Field label={copy.plannedDate} hint={copy.optional}>
               <input
                 className={inputClassName}
                 type="date"
@@ -91,7 +120,7 @@ export function PhasePlanner() {
       ))}
 
       <Button type="button" variant="secondary" onClick={addPhase}>
-        Agregar fase
+        {copy.addPhase}
       </Button>
     </div>
   );

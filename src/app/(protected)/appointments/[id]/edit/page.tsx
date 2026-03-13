@@ -4,6 +4,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { Alert } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
+import { getCurrentLocale } from "@/lib/i18n/server";
 import { toSearchParam } from "@/lib/utils";
 import { updateAppointmentAction } from "@/modules/appointments/actions";
 import { getAppointmentFormDetail, getAppointmentFormOptions } from "@/modules/appointments/queries";
@@ -15,7 +16,7 @@ export default async function EditAppointmentPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireUser();
+  const [user, locale] = await Promise.all([requireUser(), getCurrentLocale()]);
   const [{ id }, query, options] = await Promise.all([params, searchParams, getAppointmentFormOptions(user.isDemo)]);
   const appointment = await getAppointmentFormDetail(id, user.isDemo);
 
@@ -25,12 +26,32 @@ export default async function EditAppointmentPage({
 
   const error = toSearchParam(query.error);
   const redirectPath = toSearchParam(query.redirectPath) ?? "/appointments";
+  const copy = locale === "en"
+    ? {
+        title: "Edit appointment",
+        description: "Update patient, treatment, date, or notes without losing the current appointment status.",
+        submit: "Save changes",
+        saving: "Saving...",
+        confirmTitle: "Confirm appointment update",
+        confirmDescription: "The appointment data will be updated with the entered information.",
+        confirmButton: "Yes, update",
+      }
+    : {
+        title: "Editar cita",
+        description: "Actualiza paciente, tratamiento, fecha u observaciones sin perder el estado actual de la cita.",
+        submit: "Guardar cambios",
+        saving: "Guardando...",
+        confirmTitle: "Confirmar actualizacion de cita",
+        confirmDescription: "Se actualizaran los datos de la cita con la informacion ingresada.",
+        confirmButton: "Si, actualizar",
+      };
 
   return (
     <main className="space-y-6 py-4 lg:py-8">
       <Topbar
-        title="Editar cita"
-        description="Actualiza paciente, tratamiento, fecha u observaciones sin perder el estado actual de la cita."
+        title={copy.title}
+        description={copy.description}
+        locale={locale}
       />
 
       <Card>
@@ -49,12 +70,12 @@ export default async function EditAppointmentPage({
               redirectPath,
             }}
             action={updateAppointmentAction}
-            submitLabel="Guardar cambios"
-            pendingLabel="Guardando..."
+            submitLabel={copy.submit}
+            pendingLabel={copy.saving}
             confirmation={{
-              title: "Confirmar actualizacion de cita",
-              description: "Se actualizaran los datos de la cita con la informacion ingresada.",
-              confirmButtonLabel: "Si, actualizar",
+              title: copy.confirmTitle,
+              description: copy.confirmDescription,
+              confirmButtonLabel: copy.confirmButton,
             }}
           />
         </>

@@ -6,13 +6,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
+import { getCurrentLocale } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
 import {
-  appointmentBulkStatusSchema,
-  appointmentCreateSchema,
-  appointmentUpdateSchema,
-  appointmentStatusUpdateSchema,
+  createAppointmentBulkStatusSchema,
+  createAppointmentCreateSchema,
+  createAppointmentUpdateSchema,
+  createAppointmentStatusUpdateSchema,
 } from "@/modules/appointments/schemas";
 
 function appendSearchMessage(path: string, type: "error" | "success", message: string) {
@@ -40,7 +41,14 @@ async function getAppointmentOrRedirect(appointmentId: string, isDemo: boolean, 
   });
 
   if (!appointment) {
-    redirect(appendSearchMessage(redirectPath, "error", "La cita no existe en tu entorno."));
+    const locale = await getCurrentLocale();
+    redirect(
+      appendSearchMessage(
+        redirectPath,
+        "error",
+        locale === "en" ? "The appointment does not exist in your environment." : "La cita no existe en tu entorno.",
+      ),
+    );
   }
 
   return appointment;
@@ -52,6 +60,7 @@ async function resolveAppointmentReferences(params: {
   isDemo: boolean;
   redirectPath: string;
 }) {
+  const locale = await getCurrentLocale();
   const patient = await prisma.patient.findFirst({
     where: {
       id: params.patientId,
@@ -63,7 +72,13 @@ async function resolveAppointmentReferences(params: {
   });
 
   if (!patient) {
-    redirect(appendSearchMessage(params.redirectPath, "error", "El paciente no existe en tu entorno."));
+    redirect(
+      appendSearchMessage(
+        params.redirectPath,
+        "error",
+        locale === "en" ? "The patient does not exist in your environment." : "El paciente no existe en tu entorno.",
+      ),
+    );
   }
 
   let treatmentId: string | undefined;
@@ -81,11 +96,25 @@ async function resolveAppointmentReferences(params: {
     });
 
     if (!treatment) {
-      redirect(appendSearchMessage(params.redirectPath, "error", "El tratamiento no existe en tu entorno."));
+      redirect(
+        appendSearchMessage(
+          params.redirectPath,
+          "error",
+          locale === "en" ? "The treatment does not exist in your environment." : "El tratamiento no existe en tu entorno.",
+        ),
+      );
     }
 
     if (treatment.patientId !== patient.id) {
-      redirect(appendSearchMessage(params.redirectPath, "error", "El tratamiento no pertenece al paciente seleccionado."));
+      redirect(
+        appendSearchMessage(
+          params.redirectPath,
+          "error",
+          locale === "en"
+            ? "The treatment does not belong to the selected patient."
+            : "El tratamiento no pertenece al paciente seleccionado.",
+        ),
+      );
     }
 
     treatmentId = treatment.id;
@@ -132,9 +161,25 @@ function revalidateBulkAppointmentPaths(
 }
 
 export async function createAppointmentAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const copy = locale === "en"
+    ? {
+        createFailed: "The appointment could not be created.",
+        patientMissing: "The patient does not exist in your environment.",
+        treatmentMissing: "The treatment does not exist in your environment.",
+        treatmentPatientMismatch: "The treatment does not belong to the selected patient.",
+        created: "Appointment created successfully.",
+      }
+    : {
+        createFailed: "No se pudo crear la cita.",
+        patientMissing: "El paciente no existe en tu entorno.",
+        treatmentMissing: "El tratamiento no existe en tu entorno.",
+        treatmentPatientMismatch: "El tratamiento no pertenece al paciente seleccionado.",
+        created: "Cita registrada correctamente.",
+      };
 
-  const parsed = appointmentCreateSchema.safeParse({
+  const parsed = createAppointmentCreateSchema(locale).safeParse({
     patientId: formData.get("patientId"),
     treatmentId: formData.get("treatmentId"),
     scheduledAt: formData.get("scheduledAt"),
@@ -143,7 +188,7 @@ export async function createAppointmentAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`/appointments/new${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo crear la cita.")}`);
+    redirect(`/appointments/new${buildErrorSearch(parsed.error.issues[0]?.message ?? copy.createFailed)}`);
   }
 
   const references = await resolveAppointmentReferences({
@@ -173,13 +218,23 @@ export async function createAppointmentAction(formData: FormData) {
   });
 
   revalidateAppointmentPaths(references.patientId, references.treatmentId);
-  redirect(`/appointments${buildSuccessSearch("Cita registrada correctamente.")}`);
+  redirect(`/appointments${buildSuccessSearch(copy.created)}`);
 }
 
 export async function updateAppointmentAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const copy = locale === "en"
+    ? {
+        updateFailed: "The appointment could not be updated.",
+        updated: "Appointment updated successfully.",
+      }
+    : {
+        updateFailed: "No se pudo actualizar la cita.",
+        updated: "Cita actualizada correctamente.",
+      };
 
-  const parsed = appointmentUpdateSchema.safeParse({
+  const parsed = createAppointmentUpdateSchema(locale).safeParse({
     appointmentId: formData.get("appointmentId"),
     patientId: formData.get("patientId"),
     treatmentId: formData.get("treatmentId"),
@@ -194,7 +249,7 @@ export async function updateAppointmentAction(formData: FormData) {
       appendSearchMessage(
         `/appointments/${String(formData.get("appointmentId") ?? "")}/edit`,
         "error",
-        parsed.error.issues[0]?.message ?? "No se pudo actualizar la cita.",
+        parsed.error.issues[0]?.message ?? copy.updateFailed,
       ),
     );
   }
@@ -243,13 +298,31 @@ export async function updateAppointmentAction(formData: FormData) {
     revalidatePath(`/treatments/${existingAppointment.treatmentId}`);
   }
 
-  redirect(appendSearchMessage(parsed.data.redirectPath, "success", "Cita actualizada correctamente."));
+  redirect(appendSearchMessage(parsed.data.redirectPath, "success", copy.updated));
 }
 
 export async function updateAppointmentStatusAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const copy = locale === "en"
+    ? {
+        updateFailed: "The appointment status could not be updated.",
+        onlyScheduled: "Only appointments with Scheduled status can be rescheduled.",
+        invalidRescheduleDate: "The new reschedule date is invalid.",
+        distinctRescheduleDate: "Select a different date to register the reschedule.",
+        rescheduled: "Appointment rescheduled successfully.",
+        updated: "Appointment status updated.",
+      }
+    : {
+        updateFailed: "No se pudo actualizar el estado de la cita.",
+        onlyScheduled: "Solo puedes reprogramar citas con estado Agendada.",
+        invalidRescheduleDate: "La nueva fecha de reprogramacion no es valida.",
+        distinctRescheduleDate: "Selecciona una fecha distinta para registrar la reprogramacion.",
+        rescheduled: "Cita reprogramada correctamente.",
+        updated: "Estado de cita actualizado.",
+      };
 
-  const parsed = appointmentStatusUpdateSchema.safeParse({
+  const parsed = createAppointmentStatusUpdateSchema(locale).safeParse({
     appointmentId: formData.get("appointmentId"),
     status: formData.get("status"),
     redirectPath: formData.get("redirectPath"),
@@ -257,20 +330,20 @@ export async function updateAppointmentStatusAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`/appointments${buildErrorSearch("No se pudo actualizar el estado de la cita.")}`);
+    redirect(`/appointments${buildErrorSearch(copy.updateFailed)}`);
   }
 
   const existingAppointment = await getAppointmentOrRedirect(parsed.data.appointmentId, user.isDemo, parsed.data.redirectPath);
 
   if (parsed.data.status === AppointmentStatus.RESCHEDULED) {
     if (existingAppointment.status !== AppointmentStatus.SCHEDULED) {
-      redirect(appendSearchMessage(parsed.data.redirectPath, "error", "Solo puedes reprogramar citas con estado Agendada."));
+      redirect(appendSearchMessage(parsed.data.redirectPath, "error", copy.onlyScheduled));
     }
 
     const newScheduledAt = new Date(parsed.data.rescheduledAt ?? "");
 
     if (Number.isNaN(newScheduledAt.getTime())) {
-      redirect(appendSearchMessage(parsed.data.redirectPath, "error", "La nueva fecha de reprogramacion no es valida."));
+      redirect(appendSearchMessage(parsed.data.redirectPath, "error", copy.invalidRescheduleDate));
     }
 
     if (newScheduledAt.getTime() === existingAppointment.scheduledAt.getTime()) {
@@ -278,7 +351,7 @@ export async function updateAppointmentStatusAction(formData: FormData) {
         appendSearchMessage(
           parsed.data.redirectPath,
           "error",
-          "Selecciona una fecha distinta para registrar la reprogramacion.",
+          copy.distinctRescheduleDate,
         ),
       );
     }
@@ -306,7 +379,7 @@ export async function updateAppointmentStatusAction(formData: FormData) {
 
     revalidateAppointmentPaths(rescheduledAppointment.patientId, rescheduledAppointment.treatmentId);
 
-    redirect(appendSearchMessage(parsed.data.redirectPath, "success", "Cita reprogramada correctamente."));
+    redirect(appendSearchMessage(parsed.data.redirectPath, "success", copy.rescheduled));
   }
 
   const appointment = await prisma.appointment.update({
@@ -332,25 +405,39 @@ export async function updateAppointmentStatusAction(formData: FormData) {
 
   revalidateAppointmentPaths(appointment.patientId, appointment.treatmentId);
 
-  redirect(appendSearchMessage(parsed.data.redirectPath, "success", "Estado de cita actualizado."));
+  redirect(appendSearchMessage(parsed.data.redirectPath, "success", copy.updated));
 }
 
 export async function markTodayAppointmentsAsAttendedAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const copy = locale === "en"
+    ? {
+        bulkFailed: "Today's appointments could not be updated.",
+        invalidDate: "The submitted date is invalid.",
+        noPending: "There were no pending appointments today to mark.",
+        result: (count: number) => `${count} appointment${count === 1 ? "" : "s"} from today marked as attended.`,
+      }
+    : {
+        bulkFailed: "No se pudo actualizar las citas de hoy.",
+        invalidDate: "La fecha enviada no es valida.",
+        noPending: "No habia citas de hoy pendientes por marcar.",
+        result: (count: number) => `${count} cita${count === 1 ? "" : "s"} de hoy marcada${count === 1 ? "" : "s"} como asistio.`,
+      };
 
-  const parsed = appointmentBulkStatusSchema.safeParse({
+  const parsed = createAppointmentBulkStatusSchema(locale).safeParse({
     date: formData.get("date"),
     redirectPath: formData.get("redirectPath"),
   });
 
   if (!parsed.success) {
-    redirect(`/appointments${buildErrorSearch("No se pudo actualizar las citas de hoy.")}`);
+    redirect(`/appointments${buildErrorSearch(copy.bulkFailed)}`);
   }
 
   const normalizedDate = new Date(`${parsed.data.date}T00:00:00`);
 
   if (Number.isNaN(normalizedDate.getTime())) {
-    redirect(appendSearchMessage(parsed.data.redirectPath, "error", "La fecha enviada no es valida."));
+    redirect(appendSearchMessage(parsed.data.redirectPath, "error", copy.invalidDate));
   }
 
   const appointmentsToUpdate = await prisma.appointment.findMany({
@@ -372,7 +459,7 @@ export async function markTodayAppointmentsAsAttendedAction(formData: FormData) 
   });
 
   if (!appointmentsToUpdate.length) {
-    redirect(appendSearchMessage(parsed.data.redirectPath, "success", "No habia citas de hoy pendientes por marcar."));
+    redirect(appendSearchMessage(parsed.data.redirectPath, "success", copy.noPending));
   }
 
   await prisma.appointment.updateMany({
@@ -404,27 +491,41 @@ export async function markTodayAppointmentsAsAttendedAction(formData: FormData) 
     appendSearchMessage(
       parsed.data.redirectPath,
       "success",
-      `${appointmentsToUpdate.length} cita${appointmentsToUpdate.length === 1 ? "" : "s"} de hoy marcada${appointmentsToUpdate.length === 1 ? "" : "s"} como asistio.`,
+      copy.result(appointmentsToUpdate.length),
     ),
   );
 }
 
 export async function markTodayAppointmentsAsNoShowAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const copy = locale === "en"
+    ? {
+        bulkFailed: "Today's appointments could not be updated.",
+        invalidDate: "The submitted date is invalid.",
+        noPending: "There were no pending appointments today to mark as no-show.",
+        result: (count: number) => `${count} appointment${count === 1 ? "" : "s"} from today marked as no-show.`,
+      }
+    : {
+        bulkFailed: "No se pudo actualizar las citas de hoy.",
+        invalidDate: "La fecha enviada no es valida.",
+        noPending: "No habia citas de hoy pendientes por marcar como no asistio.",
+        result: (count: number) => `${count} cita${count === 1 ? "" : "s"} de hoy marcada${count === 1 ? "" : "s"} como no asistio.`,
+      };
 
-  const parsed = appointmentBulkStatusSchema.safeParse({
+  const parsed = createAppointmentBulkStatusSchema(locale).safeParse({
     date: formData.get("date"),
     redirectPath: formData.get("redirectPath"),
   });
 
   if (!parsed.success) {
-    redirect(`/appointments${buildErrorSearch("No se pudo actualizar las citas de hoy.")}`);
+    redirect(`/appointments${buildErrorSearch(copy.bulkFailed)}`);
   }
 
   const normalizedDate = new Date(`${parsed.data.date}T00:00:00`);
 
   if (Number.isNaN(normalizedDate.getTime())) {
-    redirect(appendSearchMessage(parsed.data.redirectPath, "error", "La fecha enviada no es valida."));
+    redirect(appendSearchMessage(parsed.data.redirectPath, "error", copy.invalidDate));
   }
 
   const appointmentsToUpdate = await prisma.appointment.findMany({
@@ -446,9 +547,7 @@ export async function markTodayAppointmentsAsNoShowAction(formData: FormData) {
   });
 
   if (!appointmentsToUpdate.length) {
-    redirect(
-      appendSearchMessage(parsed.data.redirectPath, "success", "No habia citas de hoy pendientes por marcar como no asistio."),
-    );
+    redirect(appendSearchMessage(parsed.data.redirectPath, "success", copy.noPending));
   }
 
   await prisma.appointment.updateMany({
@@ -480,7 +579,7 @@ export async function markTodayAppointmentsAsNoShowAction(formData: FormData) {
     appendSearchMessage(
       parsed.data.redirectPath,
       "success",
-      `${appointmentsToUpdate.length} cita${appointmentsToUpdate.length === 1 ? "" : "s"} de hoy marcada${appointmentsToUpdate.length === 1 ? "" : "s"} como no asistio.`,
+      copy.result(appointmentsToUpdate.length),
     ),
   );
 }

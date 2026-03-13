@@ -7,12 +7,13 @@ import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
+import { getCurrentLocale } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
 import {
-  userCreateSchema,
-  userToggleActiveSchema,
-  userUpdateSchema,
+  createUserCreateSchema,
+  createUserToggleActiveSchema,
+  createUserUpdateSchema,
 } from "@/modules/users/schemas";
 import {
   canActorAssignRole,
@@ -77,9 +78,23 @@ async function getManagedRoleOrRedirect(role: UserRole, actorIsDemo: boolean, re
 }
 
 export async function createUserAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const actor = await requireBaseRole(["ADMIN"]);
+  const copy = locale === "en"
+    ? {
+        createFailed: "The user could not be created.",
+        duplicateEmail: "The user could not be saved. Verify that the email is not duplicated.",
+        demoOnly: "You can only assign demo roles from a demo account.",
+        created: "User created successfully.",
+      }
+    : {
+        createFailed: "No se pudo crear el usuario.",
+        duplicateEmail: "No se pudo guardar el usuario. Verifica que el email no este duplicado.",
+        demoOnly: "Solo puedes asignar roles demo desde una cuenta demo.",
+        created: "Usuario creado correctamente.",
+      };
 
-  const parsed = userCreateSchema.safeParse({
+  const parsed = createUserCreateSchema(locale).safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     role: formData.get("role"),
@@ -87,11 +102,11 @@ export async function createUserAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`/users/new${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo crear el usuario.")}`);
+    redirect(`/users/new${buildErrorSearch(parsed.error.issues[0]?.message ?? copy.createFailed)}`);
   }
 
   if (!canActorAssignRole(actor.isDemo, parsed.data.role)) {
-    redirect(`/users/new${buildErrorSearch("Solo puedes asignar roles demo desde una cuenta demo.")}`);
+    redirect(`/users/new${buildErrorSearch(copy.demoOnly)}`);
   }
 
   const targetIsDemo = getUserEnvironmentFromRole(parsed.data.role);
@@ -118,26 +133,42 @@ export async function createUserAction(formData: FormData) {
     });
 
     revalidateUserPaths(user.id);
-    redirect(`/users/${user.id}${buildSuccessSearch("Usuario creado correctamente.")}`);
+    redirect(`/users/${user.id}${buildSuccessSearch(copy.created)}`);
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
 
     if (isDuplicateEmailError(error)) {
-      redirect(`/users/new${buildErrorSearch("No se pudo guardar el usuario. Verifica que el email no este duplicado.")}`);
+      redirect(`/users/new${buildErrorSearch(copy.duplicateEmail)}`);
     }
 
     console.error("User create failed", error);
-    redirect(`/users/new${buildErrorSearch("No se pudo crear el usuario.")}`);
+    redirect(`/users/new${buildErrorSearch(copy.createFailed)}`);
   }
 }
 
 export async function updateUserAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const actor = await requireBaseRole(["ADMIN"]);
   const userId = String(formData.get("userId") ?? "");
+  const copy = locale === "en"
+    ? {
+        updateFailed: "The user could not be updated.",
+        duplicateEmail: "The user could not be saved. Verify that the email is not duplicated.",
+        demoOnly: "You can only assign demo roles from a demo account.",
+        cannotChangeEnvironment: "An existing user's environment cannot be changed.",
+        updated: "User updated successfully.",
+      }
+    : {
+        updateFailed: "No se pudo actualizar el usuario.",
+        duplicateEmail: "No se pudo guardar el usuario. Verifica que el email no este duplicado.",
+        demoOnly: "Solo puedes asignar roles demo desde una cuenta demo.",
+        cannotChangeEnvironment: "No se puede cambiar el entorno de un usuario existente.",
+        updated: "Usuario actualizado correctamente.",
+      };
 
-  const parsed = userUpdateSchema.safeParse({
+  const parsed = createUserUpdateSchema(locale).safeParse({
     userId: userId,
     name: formData.get("name"),
     email: formData.get("email"),
@@ -147,11 +178,11 @@ export async function updateUserAction(formData: FormData) {
 
   if (!parsed.success) {
     const redirectPath = userId ? `/users/${userId}/edit` : "/users";
-    redirect(`${redirectPath}${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo actualizar el usuario.")}`);
+    redirect(`${redirectPath}${buildErrorSearch(parsed.error.issues[0]?.message ?? copy.updateFailed)}`);
   }
 
   if (!canActorAssignRole(actor.isDemo, parsed.data.role)) {
-    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch("Solo puedes asignar roles demo desde una cuenta demo.")}`);
+    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch(copy.demoOnly)}`);
   }
 
   const managedUser = await getManagedUserOrRedirect(parsed.data.userId, actor.isDemo, "/users");
@@ -160,7 +191,7 @@ export async function updateUserAction(formData: FormData) {
   const roleRecord = await getManagedRoleOrRedirect(parsed.data.role, actor.isDemo, `/users/${parsed.data.userId}/edit`);
 
   if (managedUser.isDemo !== targetIsDemo) {
-    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch("No se puede cambiar el entorno de un usuario existente.")}`);
+    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch(copy.cannotChangeEnvironment)}`);
   }
 
   try {
@@ -189,7 +220,7 @@ export async function updateUserAction(formData: FormData) {
     });
 
     revalidateUserPaths(user.id);
-    redirect(`/users/${user.id}${buildSuccessSearch("Usuario actualizado correctamente.")}`);
+    redirect(`/users/${user.id}${buildSuccessSearch(copy.updated)}`);
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
@@ -197,31 +228,45 @@ export async function updateUserAction(formData: FormData) {
 
     if (isDuplicateEmailError(error)) {
       redirect(
-        `/users/${parsed.data.userId}/edit${buildErrorSearch("No se pudo guardar el usuario. Verifica que el email no este duplicado.")}`,
+        `/users/${parsed.data.userId}/edit${buildErrorSearch(copy.duplicateEmail)}`,
       );
     }
 
     console.error("User update failed", error);
-    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch("No se pudo actualizar el usuario.")}`);
+    redirect(`/users/${parsed.data.userId}/edit${buildErrorSearch(copy.updateFailed)}`);
   }
 }
 
 export async function toggleUserActiveAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const actor = await requireBaseRole(["ADMIN"]);
+  const copy = locale === "en"
+    ? {
+        statusFailed: "The user status could not be updated.",
+        cannotDeactivateSelf: "You cannot deactivate your own account.",
+        reactivated: "User reactivated successfully.",
+        deactivated: "User deactivated successfully.",
+      }
+    : {
+        statusFailed: "No se pudo actualizar el estado del usuario.",
+        cannotDeactivateSelf: "No puedes desactivar tu propia cuenta.",
+        reactivated: "Usuario reactivado correctamente.",
+        deactivated: "Usuario desactivado correctamente.",
+      };
 
-  const parsed = userToggleActiveSchema.safeParse({
+  const parsed = createUserToggleActiveSchema().safeParse({
     userId: formData.get("userId"),
     redirectPath: formData.get("redirectPath"),
   });
 
   if (!parsed.success) {
-    redirect(`/users${buildErrorSearch("No se pudo actualizar el estado del usuario.")}`);
+    redirect(`/users${buildErrorSearch(copy.statusFailed)}`);
   }
 
   const managedUser = await getManagedUserOrRedirect(parsed.data.userId, actor.isDemo, "/users");
 
   if (managedUser.id === actor.id && managedUser.active) {
-    redirect(`${parsed.data.redirectPath}${buildErrorSearch("No puedes desactivar tu propia cuenta.")}`);
+    redirect(`${parsed.data.redirectPath}${buildErrorSearch(copy.cannotDeactivateSelf)}`);
   }
 
   const updatedUser = await prisma.user.update({
@@ -249,7 +294,7 @@ export async function toggleUserActiveAction(formData: FormData) {
   revalidateUserPaths(updatedUser.id);
   redirect(
     `${parsed.data.redirectPath}${buildSuccessSearch(
-      updatedUser.active ? "Usuario reactivado correctamente." : "Usuario desactivado correctamente.",
+      updatedUser.active ? copy.reactivated : copy.deactivated,
     )}`,
   );
 }

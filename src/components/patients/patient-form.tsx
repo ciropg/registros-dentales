@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import { useLocale } from "@/components/providers/locale-provider";
 import { Alert } from "@/components/ui/alert";
 import { buttonStyles } from "@/components/ui/button";
 import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
@@ -63,12 +64,12 @@ function FieldMessage({
   return null;
 }
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
 
   return (
     <button type="submit" className={buttonStyles({})} disabled={pending}>
-      {pending ? "Guardando..." : label}
+      {pending ? pendingLabel : label}
     </button>
   );
 }
@@ -78,6 +79,34 @@ export function PatientForm({
   defaults,
   submitLabel,
 }: PatientFormProps) {
+  const locale = useLocale();
+  const copy = locale === "en"
+    ? {
+        saving: "Saving...",
+        firstName: "First names",
+        lastName: "Last names",
+        document: "Document",
+        phone: "Phone",
+        email: "Email",
+        birthDate: "Birth date",
+        notes: "Clinical notes",
+        documentHint: "Optional. If provided, it must contain 8 digits.",
+        optional: "Optional.",
+        notesPlaceholder: "Initial patient observations",
+      }
+    : {
+        saving: "Guardando...",
+        firstName: "Nombres",
+        lastName: "Apellidos",
+        document: "Documento",
+        phone: "Telefono",
+        email: "Email",
+        birthDate: "Fecha de nacimiento",
+        notes: "Notas clinicas",
+        documentHint: "Opcional. Si lo ingresas, debe tener 8 digitos.",
+        optional: "Opcional.",
+        notesPlaceholder: "Observaciones iniciales del paciente",
+      };
   const [state, formAction] = useActionState(action, initialPatientCreateActionState);
 
   return (
@@ -86,7 +115,7 @@ export function PatientForm({
       {state.message ? <Alert message={state.message} tone="danger" /> : null}
 
       <div className="grid gap-5 md:grid-cols-2">
-        <Field label="Nombres">
+        <Field label={copy.firstName}>
           <>
             <input
               className={getFieldClassName(Boolean(state.fieldErrors.firstName))}
@@ -100,7 +129,7 @@ export function PatientForm({
           </>
         </Field>
 
-        <Field label="Apellidos">
+        <Field label={copy.lastName}>
           <>
             <input
               className={getFieldClassName(Boolean(state.fieldErrors.lastName))}
@@ -114,7 +143,7 @@ export function PatientForm({
           </>
         </Field>
 
-        <Field label="Documento">
+        <Field label={copy.document}>
           <>
             <input
               className={getFieldClassName(Boolean(state.fieldErrors.documentNumber))}
@@ -128,13 +157,13 @@ export function PatientForm({
             />
             <FieldMessage
               error={state.fieldErrors.documentNumber}
-              hint="Opcional. Si lo ingresas, debe tener 8 digitos."
+              hint={copy.documentHint}
               id="patient-document-message"
             />
           </>
         </Field>
 
-        <Field label="Telefono">
+        <Field label={copy.phone}>
           <>
             <input
               className={getFieldClassName(Boolean(state.fieldErrors.phone))}
@@ -143,11 +172,11 @@ export function PatientForm({
               aria-invalid={Boolean(state.fieldErrors.phone)}
               aria-describedby="patient-phone-message"
             />
-            <FieldMessage error={state.fieldErrors.phone} hint="Opcional." id="patient-phone-message" />
+            <FieldMessage error={state.fieldErrors.phone} hint={copy.optional} id="patient-phone-message" />
           </>
         </Field>
 
-        <Field label="Email">
+        <Field label={copy.email}>
           <>
             <input
               className={getFieldClassName(Boolean(state.fieldErrors.email))}
@@ -157,11 +186,11 @@ export function PatientForm({
               aria-invalid={Boolean(state.fieldErrors.email)}
               aria-describedby="patient-email-message"
             />
-            <FieldMessage error={state.fieldErrors.email} hint="Opcional." id="patient-email-message" />
+            <FieldMessage error={state.fieldErrors.email} hint={copy.optional} id="patient-email-message" />
           </>
         </Field>
 
-        <Field label="Fecha de nacimiento">
+        <Field label={copy.birthDate}>
           <>
             <input
               className={getFieldClassName(Boolean(state.fieldErrors.birthDate))}
@@ -171,12 +200,12 @@ export function PatientForm({
               aria-invalid={Boolean(state.fieldErrors.birthDate)}
               aria-describedby="patient-birth-date-message"
             />
-            <FieldMessage error={state.fieldErrors.birthDate} hint="Opcional." id="patient-birth-date-message" />
+            <FieldMessage error={state.fieldErrors.birthDate} hint={copy.optional} id="patient-birth-date-message" />
           </>
         </Field>
       </div>
 
-      <Field label="Notas clinicas">
+      <Field label={copy.notes}>
         <>
           <textarea
             className={cn(
@@ -185,15 +214,15 @@ export function PatientForm({
             )}
             name="notes"
             defaultValue={defaults?.notes ?? ""}
-            placeholder="Observaciones iniciales del paciente"
+            placeholder={copy.notesPlaceholder}
             aria-invalid={Boolean(state.fieldErrors.notes)}
             aria-describedby="patient-notes-message"
           />
-          <FieldMessage error={state.fieldErrors.notes} hint="Opcional." id="patient-notes-message" />
+          <FieldMessage error={state.fieldErrors.notes} hint={copy.optional} id="patient-notes-message" />
         </>
       </Field>
 
-      <SubmitButton label={submitLabel} />
+      <SubmitButton label={submitLabel} pendingLabel={copy.saving} />
     </form>
   );
 }

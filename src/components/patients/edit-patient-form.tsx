@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/components/providers/locale-provider";
 import { PatientForm } from "@/components/patients/patient-form";
 import { updatePatientAction } from "@/modules/patients/actions";
 import { format } from "date-fns";
@@ -18,10 +19,12 @@ type EditPatientFormProps = {
 };
 
 export function EditPatientForm({ patient }: EditPatientFormProps) {
+  const locale = useLocale();
+
   return (
     <PatientForm
       action={updatePatientAction}
-      submitLabel="Guardar cambios"
+      submitLabel={locale === "en" ? "Save changes" : "Guardar cambios"}
       defaults={{
         patientId: patient.id,
         firstName: patient.firstName,

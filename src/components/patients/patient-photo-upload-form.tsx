@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from "react";
+import { useLocale } from "@/components/providers/locale-provider";
 import { buttonStyles } from "@/components/ui/button";
 import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,28 @@ export function PatientPhotoUploadForm({
   patientId,
   action,
 }: PatientPhotoUploadFormProps) {
+  const locale = useLocale();
+  const copy = locale === "en"
+    ? {
+        title: "New photo",
+        pickerTitle: "Drag an image here or click to select it.",
+        selectedFile: (name: string) => `Selected file: ${name}`,
+        helper: "PNG, JPG, WEBP, and similar. Maximum 10 MB.",
+        description: "Description",
+        descriptionHint: "Optional. Helps identify the photo in the patient record.",
+        descriptionPlaceholder: "Example: Initial X-ray or postoperative check",
+        submit: "Upload photo",
+      }
+    : {
+        title: "Nueva foto",
+        pickerTitle: "Arrastra una imagen aqui o haz clic para seleccionarla.",
+        selectedFile: (name: string) => `Archivo seleccionado: ${name}`,
+        helper: "PNG, JPG, WEBP y similares. Maximo 10 MB.",
+        description: "Descripcion",
+        descriptionHint: "Opcional. Ayuda a identificar la foto en la ficha del paciente.",
+        descriptionPlaceholder: "Ejemplo: Radiografia inicial o control postoperatorio",
+        submit: "Subir foto",
+      };
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -78,7 +101,7 @@ export function PatientPhotoUploadForm({
       <input type="hidden" name="patientId" value={patientId} />
 
       <div className="space-y-2">
-        <span className="text-sm font-semibold text-foreground">Nueva foto</span>
+        <span className="text-sm font-semibold text-foreground">{copy.title}</span>
         <div
           role="button"
           tabIndex={0}
@@ -96,10 +119,10 @@ export function PatientPhotoUploadForm({
           )}
         >
           <p className="text-sm font-semibold text-foreground">
-            Arrastra una imagen aqui o haz clic para seleccionarla.
+            {copy.pickerTitle}
           </p>
           <p className="mt-1 text-xs text-muted">
-            {selectedFileName ? `Archivo seleccionado: ${selectedFileName}` : "PNG, JPG, WEBP y similares. Maximo 10 MB."}
+            {selectedFileName ? copy.selectedFile(selectedFileName) : copy.helper}
           </p>
 
           <input
@@ -116,18 +139,18 @@ export function PatientPhotoUploadForm({
         </div>
       </div>
 
-      <Field label="Descripcion" hint="Opcional. Ayuda a identificar la foto en la ficha del paciente.">
+      <Field label={copy.description} hint={copy.descriptionHint}>
         <textarea
           className={textareaClassName}
           name="description"
           rows={3}
           maxLength={500}
-          placeholder="Ejemplo: Radiografia inicial o control postoperatorio"
+          placeholder={copy.descriptionPlaceholder}
         />
       </Field>
 
       <button type="submit" className={buttonStyles({ className: "self-end" })}>
-        Subir foto
+        {copy.submit}
       </button>
     </form>
   );

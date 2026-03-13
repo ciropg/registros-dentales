@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { format } from "date-fns";
+import { useLocale } from "@/components/providers/locale-provider";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { buttonStyles } from "@/components/ui/button";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
@@ -57,9 +58,40 @@ export function AppointmentForm({
   defaults,
   action,
   submitLabel,
-  pendingLabel = "Guardando...",
+  pendingLabel,
   confirmation,
 }: AppointmentFormProps) {
+  const locale = useLocale();
+  const copy = locale === "en"
+    ? {
+        saving: "Saving...",
+        patient: "Patient",
+        patientHint: "Type the name and choose a suggestion.",
+        patientPlaceholder: "Example: Mario Quispe",
+        treatment: "Linked treatment",
+        optional: "Optional.",
+        noTreatment: "No linked treatment",
+        dateTime: "Date and time",
+        reason: "Reason",
+        reasonPlaceholder: "Monthly check, adjustment, cleaning...",
+        notes: "Notes",
+        notesPlaceholder: "Operational or clinical notes",
+      }
+    : {
+        saving: "Guardando...",
+        patient: "Paciente",
+        patientHint: "Escribe el nombre y elige una sugerencia.",
+        patientPlaceholder: "Ejemplo: Mario Quispe",
+        treatment: "Tratamiento asociado",
+        optional: "Opcional.",
+        noTreatment: "Sin asociar",
+        dateTime: "Fecha y hora",
+        reason: "Motivo",
+        reasonPlaceholder: "Control mensual, ajuste, limpieza...",
+        notes: "Notas",
+        notesPlaceholder: "Observaciones operativas o clinicas",
+      };
+  const resolvedPendingLabel = pendingLabel ?? copy.saving;
   const patientListId = useId();
   const defaultPatientId = defaults?.patientId ?? "";
   const defaultTreatmentId = defaults?.treatmentId ?? "";
@@ -101,14 +133,14 @@ export function AppointmentForm({
   const formFields = (
     <>
       <div className="grid gap-5 md:grid-cols-2">
-        <Field label="Paciente" hint="Escribe el nombre y elige una sugerencia.">
+        <Field label={copy.patient} hint={copy.patientHint}>
           <>
             <input
               className={inputClassName}
               list={patientListId}
               value={patientSearch}
               onChange={(event) => handlePatientInput(event.target.value)}
-              placeholder="Ejemplo: Mario Quispe"
+              placeholder={copy.patientPlaceholder}
               required
             />
             <datalist id={patientListId}>
@@ -120,14 +152,14 @@ export function AppointmentForm({
           </>
         </Field>
 
-        <Field label="Tratamiento asociado" hint="Opcional.">
+        <Field label={copy.treatment} hint={copy.optional}>
           <select
             className={selectClassName}
             name="treatmentId"
             value={selectedTreatmentId}
             onChange={(event) => setSelectedTreatmentId(event.target.value)}
           >
-            <option value="">Sin asociar</option>
+            <option value="">{copy.noTreatment}</option>
             {filteredTreatments.map((treatment) => (
               <option key={treatment.id} value={treatment.id}>
                 {treatment.title} - {treatment.patient.firstName} {treatment.patient.lastName}
@@ -136,7 +168,7 @@ export function AppointmentForm({
           </select>
         </Field>
 
-        <Field label="Fecha y hora">
+        <Field label={copy.dateTime}>
           <input
             className={inputClassName}
             type="datetime-local"
@@ -146,22 +178,22 @@ export function AppointmentForm({
           />
         </Field>
 
-        <Field label="Motivo" hint="Opcional.">
+        <Field label={copy.reason} hint={copy.optional}>
           <input
             className={inputClassName}
             name="reason"
             defaultValue={defaults?.reason ?? ""}
-            placeholder="Control mensual, ajuste, limpieza..."
+            placeholder={copy.reasonPlaceholder}
           />
         </Field>
       </div>
 
-      <Field label="Notas" hint="Opcional.">
+      <Field label={copy.notes} hint={copy.optional}>
         <textarea
           className={textareaClassName}
           name="notes"
           defaultValue={defaults?.notes ?? ""}
-          placeholder="Observaciones operativas o clinicas"
+          placeholder={copy.notesPlaceholder}
         />
       </Field>
     </>
@@ -174,7 +206,7 @@ export function AppointmentForm({
         className="space-y-5"
         hiddenFields={hiddenFields}
         submitLabel={submitLabel}
-        pendingLabel={pendingLabel}
+        pendingLabel={resolvedPendingLabel}
         confirmTitle={confirmation.title}
         confirmDescription={confirmation.description}
         confirmButtonLabel={confirmation.confirmButtonLabel}

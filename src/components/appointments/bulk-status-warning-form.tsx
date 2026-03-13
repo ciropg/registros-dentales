@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/components/providers/locale-provider";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { type ButtonVariant } from "@/components/ui/button";
 
@@ -22,6 +23,8 @@ export function BulkStatusWarningForm({
   variant = "warning",
   action,
 }: BulkStatusWarningFormProps) {
+  const locale = useLocale();
+
   return (
     <ConfirmActionForm
       action={action}
@@ -35,7 +38,7 @@ export function BulkStatusWarningForm({
       submitSize="sm"
       confirmTitle={buttonLabel}
       confirmDescription={confirmMessage}
-      confirmButtonLabel="Si, continuar"
+      confirmButtonLabel={locale === "en" ? "Yes, continue" : "Si, continuar"}
       confirmButtonVariant={variant}
       confirmTone={variant === "warning" ? "warning" : "neutral"}
     />

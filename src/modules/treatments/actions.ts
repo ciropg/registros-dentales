@@ -5,27 +5,44 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireBaseRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
+import { getCurrentLocale } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { getConcreteRolesForBaseRoles } from "@/lib/roles";
 import { buildErrorSearch, buildSuccessSearch } from "@/lib/utils";
 import {
-  treatmentCreateSchema,
-  treatmentUpdateSchema,
-  treatmentPhaseUpdateSchema,
+  createTreatmentCreateSchema,
+  createTreatmentUpdateSchema,
+  createTreatmentPhaseUpdateSchema,
 } from "@/modules/treatments/schemas";
 
 export async function createTreatmentAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
+  const copy = locale === "en"
+    ? {
+        parsePhasesFailed: "The treatment phases could not be read.",
+        createFailed: "The treatment could not be created.",
+        patientMissing: "The patient does not exist in your environment.",
+        dentistMissing: "The responsible user does not exist in your environment.",
+        created: "Treatment created successfully.",
+      }
+    : {
+        parsePhasesFailed: "No se pudieron leer las fases del tratamiento.",
+        createFailed: "No se pudo crear el tratamiento.",
+        patientMissing: "El paciente no existe en tu entorno.",
+        dentistMissing: "El responsable no existe en tu entorno.",
+        created: "Tratamiento creado correctamente.",
+      };
 
   let parsedPhases: unknown[] = [];
 
   try {
     parsedPhases = JSON.parse(String(formData.get("phases") ?? "[]"));
   } catch {
-    redirect(`/treatments/new${buildErrorSearch("No se pudieron leer las fases del tratamiento.")}`);
+    redirect(`/treatments/new${buildErrorSearch(copy.parsePhasesFailed)}`);
   }
 
-  const parsed = treatmentCreateSchema.safeParse({
+  const parsed = createTreatmentCreateSchema(locale).safeParse({
     patientId: formData.get("patientId"),
     dentistId: formData.get("dentistId"),
     title: formData.get("title"),
@@ -37,7 +54,7 @@ export async function createTreatmentAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`/treatments/new${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo crear el tratamiento.")}`);
+    redirect(`/treatments/new${buildErrorSearch(parsed.error.issues[0]?.message ?? copy.createFailed)}`);
   }
 
   const patient = await prisma.patient.findFirst({
@@ -51,7 +68,7 @@ export async function createTreatmentAction(formData: FormData) {
   });
 
   if (!patient) {
-    redirect(`/treatments/new${buildErrorSearch("El paciente no existe en tu entorno.")}`);
+    redirect(`/treatments/new${buildErrorSearch(copy.patientMissing)}`);
   }
 
   let dentistId: string | undefined;
@@ -72,7 +89,7 @@ export async function createTreatmentAction(formData: FormData) {
     });
 
     if (!dentist) {
-      redirect(`/treatments/new${buildErrorSearch("El responsable no existe en tu entorno.")}`);
+      redirect(`/treatments/new${buildErrorSearch(copy.dentistMissing)}`);
     }
 
     dentistId = dentist.id;
@@ -116,20 +133,32 @@ export async function createTreatmentAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/patients");
   revalidatePath(`/patients/${parsed.data.patientId}`);
-  redirect(`/treatments/${treatment.id}${buildSuccessSearch("Tratamiento creado correctamente.")}`);
+  redirect(`/treatments/${treatment.id}${buildSuccessSearch(copy.created)}`);
 }
 
 export async function updatePhaseStatusAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT"]);
+  const copy = locale === "en"
+    ? {
+        phaseUpdateFailed: "The phase could not be updated.",
+        treatmentMissing: "The treatment does not exist in your environment.",
+        phaseUpdated: "Phase updated.",
+      }
+    : {
+        phaseUpdateFailed: "No se pudo actualizar la fase.",
+        treatmentMissing: "El tratamiento no existe en tu entorno.",
+        phaseUpdated: "Fase actualizada.",
+      };
 
-  const parsed = treatmentPhaseUpdateSchema.safeParse({
+  const parsed = createTreatmentPhaseUpdateSchema().safeParse({
     treatmentId: formData.get("treatmentId"),
     phaseId: formData.get("phaseId"),
     status: formData.get("status"),
   });
 
   if (!parsed.success) {
-    redirect(`/dashboard${buildErrorSearch("No se pudo actualizar la fase.")}`);
+    redirect(`/dashboard${buildErrorSearch(copy.phaseUpdateFailed)}`);
   }
 
   const phase = await prisma.treatmentPhase.findFirst({
@@ -147,7 +176,7 @@ export async function updatePhaseStatusAction(formData: FormData) {
   });
 
   if (!phase) {
-    redirect(`/dashboard${buildErrorSearch("El tratamiento no existe en tu entorno.")}`);
+    redirect(`/dashboard${buildErrorSearch(copy.treatmentMissing)}`);
   }
 
   await prisma.treatmentPhase.update({
@@ -190,15 +219,29 @@ export async function updatePhaseStatusAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath(`/treatments/${phase.treatmentId}`);
-  redirect(`/treatments/${phase.treatmentId}${buildSuccessSearch("Fase actualizada.")}`);
+  redirect(`/treatments/${phase.treatmentId}${buildSuccessSearch(copy.phaseUpdated)}`);
 }
 
 export async function updateTreatmentAction(formData: FormData) {
+  const locale = await getCurrentLocale();
   const user = await requireBaseRole(["ADMIN", "DENTIST", "ASSISTANT", "RECEPTIONIST"]);
   const treatmentId = String(formData.get("treatmentId") ?? "");
   const editRedirectPath = treatmentId ? `/treatments/${treatmentId}/edit` : "/dashboard";
+  const copy = locale === "en"
+    ? {
+        updateFailed: "The treatment could not be updated.",
+        treatmentMissing: "The treatment does not exist in your environment.",
+        dentistMissing: "The responsible user does not exist in your environment.",
+        updated: "Treatment updated successfully.",
+      }
+    : {
+        updateFailed: "No se pudo actualizar el tratamiento.",
+        treatmentMissing: "El tratamiento no existe en tu entorno.",
+        dentistMissing: "El responsable no existe en tu entorno.",
+        updated: "Tratamiento actualizado correctamente.",
+      };
 
-  const parsed = treatmentUpdateSchema.safeParse({
+  const parsed = createTreatmentUpdateSchema(locale).safeParse({
     treatmentId: formData.get("treatmentId"),
     dentistId: formData.get("dentistId"),
     title: formData.get("title"),
@@ -209,7 +252,7 @@ export async function updateTreatmentAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`${editRedirectPath}${buildErrorSearch(parsed.error.issues[0]?.message ?? "No se pudo actualizar el tratamiento.")}`);
+    redirect(`${editRedirectPath}${buildErrorSearch(parsed.error.issues[0]?.message ?? copy.updateFailed)}`);
   }
 
   const existingTreatment = await prisma.treatment.findFirst({
@@ -224,7 +267,7 @@ export async function updateTreatmentAction(formData: FormData) {
   });
 
   if (!existingTreatment) {
-    redirect(`/dashboard${buildErrorSearch("El tratamiento no existe en tu entorno.")}`);
+    redirect(`/dashboard${buildErrorSearch(copy.treatmentMissing)}`);
   }
 
   let dentistId: string | undefined;
@@ -245,7 +288,7 @@ export async function updateTreatmentAction(formData: FormData) {
     });
 
     if (!dentist) {
-      redirect(`${editRedirectPath}${buildErrorSearch("El responsable no existe en tu entorno.")}`);
+      redirect(`${editRedirectPath}${buildErrorSearch(copy.dentistMissing)}`);
     }
 
     dentistId = dentist.id;
@@ -281,5 +324,5 @@ export async function updateTreatmentAction(formData: FormData) {
   revalidatePath(`/treatments/${treatment.id}`);
   revalidatePath(`/treatments/${treatment.id}/edit`);
 
-  redirect(`/treatments/${treatment.id}${buildSuccessSearch("Tratamiento actualizado correctamente.")}`);
+  redirect(`/treatments/${treatment.id}${buildSuccessSearch(copy.updated)}`);
 }

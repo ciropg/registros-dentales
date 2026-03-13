@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useLocale } from "@/components/providers/locale-provider";
 import { buttonStyles } from "@/components/ui/button";
 import { Modal, type ModalTone } from "@/components/ui/modal";
+import { getMessages } from "@/lib/i18n/messages";
 
 export function SearchParamFeedbackModal({
   message,
@@ -11,7 +13,7 @@ export function SearchParamFeedbackModal({
   title,
   description,
   tone = "success",
-  closeLabel = "Entendido",
+  closeLabel,
 }: {
   message?: string;
   queryKey: string;
@@ -20,6 +22,8 @@ export function SearchParamFeedbackModal({
   tone?: ModalTone;
   closeLabel?: string;
 }) {
+  const locale = useLocale();
+  const copy = getMessages(locale);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -46,7 +50,7 @@ export function SearchParamFeedbackModal({
   return (
     <Modal open={open} title={title} description={description ?? message} tone={tone} onClose={handleClose}>
       <button type="button" className={buttonStyles({})} onClick={handleClose}>
-        {closeLabel}
+        {closeLabel ?? copy.feedback.close}
       </button>
     </Modal>
   );
